@@ -10,6 +10,19 @@
 #include "../parser/parser.hpp"
 
 namespace {
+struct SQLiteStmt {
+  sqlite3_stmt* stmt = nullptr;
+
+  ~SQLiteStmt() {
+    if (stmt) {
+      sqlite3_finalize(stmt);
+    }
+  }
+
+  operator sqlite3_stmt*() const { return stmt; }
+  sqlite3_stmt** operator&() { return &stmt; }
+};
+
 std::string read_file_by_index(zip_t* archive, zip_uint64_t index) {
   zip_stat_t stat;
   if (zip_stat_index(archive, index, 0, &stat) != 0) {
@@ -91,7 +104,7 @@ void init_db(sqlite3* db) {
 }
 
 void store_index(sqlite3* db, const Index& index, const std::string& styles) {
-  sqlite3_stmt* stmt;
+  SQLiteStmt stmt;
   sqlite3_prepare_v2(db, "INSERT INTO info VALUES (?, ?, ?, ?)", -1, &stmt, nullptr);
   sqlite3_bind_text(stmt, 1, index.title.data(), (int)index.title.size(), SQLITE_STATIC);
   sqlite3_bind_text(stmt, 2, index.revision.data(), (int)index.revision.size(), SQLITE_STATIC);
@@ -111,7 +124,7 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& f
     return;
   }
 
-  sqlite3_stmt* stmt;
+  SQLiteStmt stmt;
   sqlite3_prepare_v2(db, "INSERT INTO terms VALUES (?, ?, ?, ?, ?, ?, ?, ?)", -1, &stmt, nullptr);
 
   Term term;
@@ -151,7 +164,7 @@ void store_meta(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& fi
     return;
   }
 
-  sqlite3_stmt* stmt;
+  SQLiteStmt stmt;
   sqlite3_prepare_v2(db, "INSERT INTO term_meta VALUES (?, ?, ?)", -1, &stmt, nullptr);
   Meta meta;
   for (const auto& index : files) {
@@ -180,6 +193,7 @@ void store_tags(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& fi
   if (files.empty()) {
     return;
   }
+
   sqlite3_stmt* stmt;
   sqlite3_prepare_v2(db, "INSERT INTO tags VALUES (?, ?, ?, ?, ?)", -1, &stmt, nullptr);
   Tag tag;
@@ -258,10 +272,8 @@ ImportResult dictionary_importer::import(const std::string& zip_path) {
     store_terms(db, archive, term_banks, result);
     store_meta(db, archive, meta_banks, result);
     store_tags(db, archive, tag_banks, result);
-
-    result.success = true;
-
     sqlite3_exec(db, "COMMIT", nullptr, nullptr, nullptr);
+    result.success = true;
 
     sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_terms_expression ON terms(expression);",
                  nullptr, nullptr, nullptr);
@@ -279,6 +291,7 @@ ImportResult dictionary_importer::import(const std::string& zip_path) {
   if (archive) {
     zip_close(archive);
   }
+
   if (db) {
     sqlite3_close(db);
   }

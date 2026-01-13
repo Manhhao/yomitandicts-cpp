@@ -25,6 +25,7 @@ bool YomitanJSONParser::parse_index(Index& out) {
       return false;
     }
     pos_++;
+
     if (key == "title") {
       out.title = parse_string();
     } else if (key == "revision") {
@@ -44,10 +45,14 @@ bool YomitanJSONParser::parse_term(Term& out) {
   if (!enter_next_entry()) {
     return false;
   }
+
   out.expression = parse_string();
   consume_comma();
 
   out.reading = parse_string();
+  if (out.reading.empty()) {
+    out.reading = out.expression;
+  }
   consume_comma();
 
   out.definition_tags = parse_string();
@@ -58,10 +63,6 @@ bool YomitanJSONParser::parse_term(Term& out) {
 
   out.score = parse_number();
   consume_comma();
-
-  if (out.reading.empty()) {
-    out.reading = out.expression;
-  }
 
   out.glossary = extract_single_value();
   consume_comma();
@@ -210,7 +211,6 @@ std::string_view YomitanJSONParser::extract_single_value() {
   consume_whitespace();
   size_t start = pos_;
   char c = src_[pos_];
-
   if (c == '"') {
     skip_string();
   } else if (c == '[' || c == '{') {
