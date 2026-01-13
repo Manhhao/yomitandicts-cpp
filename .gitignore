@@ -39,3 +39,10 @@
 
 # debug information files
 *.dwo
+
+# directories
+build/
+.cache/
+
+# macos ds_store
+.DS_Store
