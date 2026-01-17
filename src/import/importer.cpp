@@ -10,19 +10,6 @@
 #include "../parser/parser.hpp"
 
 namespace {
-struct SQLiteStmt {
-  sqlite3_stmt* stmt = nullptr;
-
-  ~SQLiteStmt() {
-    if (stmt) {
-      sqlite3_finalize(stmt);
-    }
-  }
-
-  operator sqlite3_stmt*() const { return stmt; }
-  sqlite3_stmt** operator&() { return &stmt; }
-};
-
 std::string read_file_by_index(zip_t* archive, zip_uint64_t index) {
   zip_stat_t stat;
   if (zip_stat_index(archive, index, 0, &stat) != 0) {

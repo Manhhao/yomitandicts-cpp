@@ -5,6 +5,19 @@
 #include <string>
 #include <vector>
 
+struct SQLiteStmt {
+  sqlite3_stmt* stmt = nullptr;
+
+  ~SQLiteStmt() {
+    if (stmt) {
+      sqlite3_finalize(stmt);
+    }
+  }
+
+  operator sqlite3_stmt*() const { return stmt; }
+  sqlite3_stmt** operator&() { return &stmt; }
+};
+
 struct ImportResult {
   bool success = false;
   std::string title;
