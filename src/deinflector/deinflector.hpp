@@ -19,6 +19,7 @@ class Deinflector {
  public:
   Deinflector();
   std::vector<DeinflectionResult> deinflect(const std::string& text);
+  uint32_t pos_to_conditions(const std::vector<std::string>& parts_of_speech);
 
  private:
   struct Rule {
@@ -29,7 +30,7 @@ class Deinflector {
     int group_id;
   };
 
-  enum Conditions : std::uint32_t {
+  enum Conditions : uint32_t {
     NONE = 0,
     V = 1 << 0,
     V1 = 1 << 1,
@@ -55,9 +56,8 @@ class Deinflector {
     YA = 1 << 21
   };
 
-  void deinflect_recursive(const std::string& text, uint32_t conditions,
-                                                      std::vector<TransformGroup>& trace,
-                                                      std::vector<DeinflectionResult>& results);
+  void deinflect_recursive(const std::string& text, uint32_t conditions, std::vector<TransformGroup>& trace,
+                           std::vector<DeinflectionResult>& results);
 
   void init_transforms();
 
@@ -66,5 +66,5 @@ class Deinflector {
 
   std::unordered_map<std::string, std::vector<Rule>> transforms_;
   std::vector<TransformGroup> groups_;
-  size_t max_length_; 
+  size_t max_length_;
 };

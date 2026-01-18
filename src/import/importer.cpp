@@ -89,7 +89,7 @@ void init_db(sqlite3* db) {
 }
 
 void store_index(sqlite3* db, const Index& index, const std::string& styles) {
-  SQLiteStmt stmt;
+  sqlite3_stmt* stmt;
   sqlite3_prepare_v2(db, "INSERT INTO info VALUES (?, ?, ?, ?)", -1, &stmt, nullptr);
   sqlite3_bind_text(stmt, 1, index.title.data(), (int)index.title.size(), SQLITE_STATIC);
   sqlite3_bind_text(stmt, 2, index.revision.data(), (int)index.revision.size(), SQLITE_STATIC);
@@ -103,13 +103,12 @@ void store_index(sqlite3* db, const Index& index, const std::string& styles) {
   sqlite3_finalize(stmt);
 }
 
-void store_terms(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& files,
-                 ImportResult& result) {
+void store_terms(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& files, ImportResult& result) {
   if (files.empty()) {
     return;
   }
 
-  SQLiteStmt stmt;
+  sqlite3_stmt* stmt;
   sqlite3_prepare_v2(db, "INSERT INTO terms VALUES (?, ?, ?, ?, ?, ?, ?, ?)", -1, &stmt, nullptr);
 
   Term term;
@@ -121,11 +120,9 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& f
 
     YomitanJSONParser parser(content);
     while (parser.parse_term(term)) {
-      sqlite3_bind_text(stmt, 1, term.expression.data(), (int)term.expression.size(),
-                        SQLITE_STATIC);
+      sqlite3_bind_text(stmt, 1, term.expression.data(), (int)term.expression.size(), SQLITE_STATIC);
       sqlite3_bind_text(stmt, 2, term.reading.data(), (int)term.reading.size(), SQLITE_STATIC);
-      sqlite3_bind_text(stmt, 3, term.definition_tags.data(), (int)term.definition_tags.size(),
-                        SQLITE_STATIC);
+      sqlite3_bind_text(stmt, 3, term.definition_tags.data(), (int)term.definition_tags.size(), SQLITE_STATIC);
       sqlite3_bind_text(stmt, 4, term.rules.data(), (int)term.rules.size(), SQLITE_STATIC);
       sqlite3_bind_int(stmt, 5, term.score);
 
@@ -143,13 +140,12 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& f
   sqlite3_finalize(stmt);
 }
 
-void store_meta(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& files,
-                ImportResult& result) {
+void store_meta(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& files, ImportResult& result) {
   if (files.empty()) {
     return;
   }
 
-  SQLiteStmt stmt;
+  sqlite3_stmt* stmt;
   sqlite3_prepare_v2(db, "INSERT INTO term_meta VALUES (?, ?, ?)", -1, &stmt, nullptr);
   Meta meta;
   for (const auto& index : files) {
@@ -160,8 +156,7 @@ void store_meta(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& fi
 
     YomitanJSONParser parser(content);
     while (parser.parse_meta(meta)) {
-      sqlite3_bind_text(stmt, 1, meta.expression.data(), (int)meta.expression.size(),
-                        SQLITE_STATIC);
+      sqlite3_bind_text(stmt, 1, meta.expression.data(), (int)meta.expression.size(), SQLITE_STATIC);
       sqlite3_bind_text(stmt, 2, meta.mode.data(), (int)meta.mode.size(), SQLITE_STATIC);
       sqlite3_bind_text(stmt, 3, meta.data.data(), (int)meta.data.size(), SQLITE_STATIC);
 
@@ -173,8 +168,7 @@ void store_meta(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& fi
   sqlite3_finalize(stmt);
 }
 
-void store_tags(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& files,
-                ImportResult& result) {
+void store_tags(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& files, ImportResult& result) {
   if (files.empty()) {
     return;
   }
@@ -260,12 +254,11 @@ ImportResult dictionary_importer::import(const std::string& zip_path) {
     sqlite3_exec(db, "COMMIT", nullptr, nullptr, nullptr);
     result.success = true;
 
-    sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_terms_expression ON terms(expression);",
-                 nullptr, nullptr, nullptr);
-    sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_terms_reading ON terms(reading);", nullptr,
-                 nullptr, nullptr);
-    sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_meta_expression ON term_meta(expression);",
-                 nullptr, nullptr, nullptr);
+    sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_terms_expression ON terms(expression);", nullptr, nullptr,
+                 nullptr);
+    sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_terms_reading ON terms(reading);", nullptr, nullptr, nullptr);
+    sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_meta_expression ON term_meta(expression);", nullptr, nullptr,
+                 nullptr);
 
     sqlite3_exec(db, "PRAGMA analyze;", nullptr, nullptr, nullptr);
   } catch (const std::exception& e) {

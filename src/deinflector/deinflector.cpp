@@ -2,7 +2,8 @@
 
 Deinflector::Deinflector() { init_transforms(); }
 
-// rules and descriptions adopted from https://github.com/yomidevs/yomitan/blob/master/ext/js/language/ja/japanese-transforms.js
+// rules and descriptions adopted from
+// https://github.com/yomidevs/yomitan/blob/master/ext/js/language/ja/japanese-transforms.js
 void Deinflector::init_transforms() {
   int id =
       add_group({.name = "-ば",
@@ -881,17 +882,70 @@ std::vector<DeinflectionResult> Deinflector::deinflect(const std::string& text) 
   return result;
 }
 
-void Deinflector::deinflect_recursive(const std::string& text, uint32_t conditions,
-                                      std::vector<TransformGroup>& trace,
+enum Conditions : uint32_t {
+  NONE = 0,
+  V = 1 << 0,
+  V1 = 1 << 1,
+  V1D = 1 << 2,
+  V1P = 1 << 3,
+  V5 = 1 << 4,
+  V5D = 1 << 5,
+  V5S = 1 << 6,
+  V5SS = 1 << 7,
+  V5SP = 1 << 8,
+  VK = 1 << 9,
+  VS = 1 << 10,
+  VZ = 1 << 11,
+  ADJ_I = 1 << 12,
+  MASU = 1 << 13,
+  MASEN = 1 << 14,
+  TE = 1 << 15,
+  BA = 1 << 16,
+  KU = 1 << 17,
+  TA = 1 << 18,
+  NN = 1 << 19,
+  NASAI = 1 << 20,
+  YA = 1 << 21
+};
+
+uint32_t pos_to_conditions(const std::vector<std::string>& parts_of_speech) {
+  uint32_t result = 0;
+  for (const auto& p : parts_of_speech) {
+    if (p.starts_with("v")) {
+      result |= V;
+    }
+    if (p.starts_with("v1")) {
+      result |= V1;
+    }
+    if (p.starts_with("v5")) {
+      result |= V5;
+    }
+    if (p == "vk") {
+      result |= VK;
+    }
+    if (p == "vs") {
+      result |= VS;
+    }
+    if (p == "vz") {
+      result |= VZ;
+    }
+    if (p == "adj-i") {
+      result |= ADJ_I;
+    }
+  }
+  return result;
+}
+
+void Deinflector::deinflect_recursive(const std::string& text, uint32_t conditions, std::vector<TransformGroup>& trace,
                                       std::vector<DeinflectionResult>& results) {
   results.emplace_back(text, conditions, trace);
   if (text.empty()) {
     return;
   }
-  
+
   for (size_t i = std::min(max_length_, text.size()); i > 0; i--) {
     std::string suffix = text.substr(text.size() - i);
-    
+
     auto it = transforms_.find(suffix);
     if (it == transforms_.end()) {
       continue;
@@ -901,9 +955,9 @@ void Deinflector::deinflect_recursive(const std::string& text, uint32_t conditio
       if (conditions != NONE && !(conditions & rule.conditions_in)) {
         continue;
       }
-      
+
       std::string transformed = text.substr(0, text.size() - i) + rule.to;
-      
+
       trace.emplace_back(groups_[rule.group_id]);
       deinflect_recursive(transformed, rule.conditions_out, trace, results);
       trace.pop_back();
