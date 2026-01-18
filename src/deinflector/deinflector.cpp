@@ -920,7 +920,7 @@ void Deinflector::deinflect_recursive(const std::string& text, uint32_t conditio
   }
 
   size_t text_len = utf8::length(text);
-  for (size_t i = std::min(max_length_, text_len); i > 0; i--) {
+  for (size_t i = std::min(max_length_, text_len); i > 1; i--) {
     size_t prefix_chars = text_len - i;
     size_t prefix_bytes = utf8::byte_position(text, prefix_chars);
 
