@@ -1,6 +1,6 @@
+#include <chrono>
 #include <iostream>
 #include <string>
-#include <chrono>
 
 #include "deinflector/deinflector.hpp"
 #include "import/importer.hpp"
@@ -15,7 +15,7 @@ void print_usage(const char* program) {
 
 void cmd_import(const std::string& path) {
   ImportResult result = dictionary_importer::import(path);
-  
+
   if (result.success) {
     std::cout << "title: " << result.title << "\n";
     std::cout << "term_count: " << result.term_count << "\n";
@@ -32,17 +32,17 @@ void cmd_import(const std::string& path) {
 void cmd_deinflect(const std::string& word) {
   Deinflector deinflector;
   auto results = deinflector.deinflect(word);
-  
+
   std::cout << "deinflections for: " << word << "\n";
   std::cout << "found " << results.size() << " candidates\n\n";
-  
+
   for (const auto& r : results) {
     std::cout << r.text << " (conditions: " << r.conditions << ")\n";
     if (!r.trace.empty()) {
       std::cout << "  ";
       for (size_t i = 0; i < r.trace.size(); i++) {
         std::cout << r.trace[i].name;
-        if (i < r.trace.size() - 1) { 
+        if (i < r.trace.size() - 1) {
           std::cout << " -> ";
         }
       }
@@ -60,7 +60,7 @@ void cmd_query(const std::string& db_path, const std::string& expression) {
   std::cout << result.size() << " entries\n";
   for (const auto& r : result) {
     std::cout << "---------------------------------------------------------------\n";
-    std::cout << r.expression << " " << r.reading << " " << r.definition_tags <<"\n";
+    std::cout << r.expression << " " << r.reading << " " << r.definition_tags << "\n";
     std::cout << r.glossaries.size() << " glossary entries\n";
     for (const auto& g : r.glossaries) {
       std::cout << "------\n";
