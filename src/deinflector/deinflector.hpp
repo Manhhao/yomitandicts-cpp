@@ -18,7 +18,7 @@ struct DeinflectionResult {
 class Deinflector {
  public:
   Deinflector();
-  std::vector<DeinflectionResult> deinflect(const std::string& text);
+  std::vector<DeinflectionResult> deinflect(const std::string& text) const;
   static uint32_t pos_to_conditions(const std::vector<std::string>& parts_of_speech);
 
  private:
@@ -57,7 +57,7 @@ class Deinflector {
   };
 
   void deinflect_recursive(const std::string& text, uint32_t conditions, std::vector<TransformGroup>& trace,
-                           std::vector<DeinflectionResult>& results);
+                           std::vector<DeinflectionResult>& results) const;
 
   void init_transforms();
 

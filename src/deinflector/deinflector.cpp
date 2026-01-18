@@ -1,5 +1,8 @@
 #include "deinflector.hpp"
 
+#include <algorithm>
+
+#include "utf8.hpp"
 Deinflector::Deinflector() { init_transforms(); }
 
 // rules and descriptions adopted from
@@ -870,13 +873,12 @@ int Deinflector::add_group(const TransformGroup& group) {
 
 void Deinflector::add_rule(const Rule& rule) {
   transforms_[rule.from].emplace_back(rule);
-  max_length_ = std::max(rule.from.size(), max_length_);
+  max_length_ = std::max(utf8::length(rule.from), max_length_);
 }
 
-std::vector<DeinflectionResult> Deinflector::deinflect(const std::string& text) {
+std::vector<DeinflectionResult> Deinflector::deinflect(const std::string& text) const {
   std::vector<DeinflectionResult> result{};
   std::vector<TransformGroup> trace{};
-
   deinflect_recursive(text, NONE, trace, result);
 
   return result;
@@ -911,26 +913,30 @@ uint32_t Deinflector::pos_to_conditions(const std::vector<std::string>& parts_of
 }
 
 void Deinflector::deinflect_recursive(const std::string& text, uint32_t conditions, std::vector<TransformGroup>& trace,
-                                      std::vector<DeinflectionResult>& results) {
+                                      std::vector<DeinflectionResult>& results) const {
   results.emplace_back(text, conditions, trace);
   if (text.empty()) {
     return;
   }
 
-  for (size_t i = std::min(max_length_, text.size()); i > 0; i--) {
-    std::string suffix = text.substr(text.size() - i);
+  size_t text_len = utf8::length(text);
+  for (size_t i = std::min(max_length_, text_len); i > 0; i--) {
+    size_t prefix_chars = text_len - i;
+    size_t prefix_bytes = utf8::byte_position(text, prefix_chars);
 
+    std::string suffix = text.substr(prefix_bytes);
     auto it = transforms_.find(suffix);
     if (it == transforms_.end()) {
       continue;
     }
 
-    for (auto& rule : it->second) {
+    std::string prefix = text.substr(0, prefix_bytes);
+    for (const auto& rule : it->second) {
       if (conditions != NONE && !(conditions & rule.conditions_in)) {
         continue;
       }
 
-      std::string transformed = text.substr(0, text.size() - i) + rule.to;
+      std::string transformed = prefix + rule.to;
 
       trace.emplace_back(groups_[rule.group_id]);
       deinflect_recursive(transformed, rule.conditions_out, trace, results);
