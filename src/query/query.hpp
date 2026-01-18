@@ -10,11 +10,17 @@ struct GlossaryEntry {
   std::string glossary;
 };
 
+struct FrequencyEntry {
+  std::string dict_name;
+  std::string data;
+};
+
 struct TermResult {
   std::string expression;
   std::string reading;
+  std::string definition_tags;
   std::vector<GlossaryEntry> glossaries;
-  int frequency;
+  std::vector<FrequencyEntry> frequencies;
 };
 
 class DictionaryQuery {
@@ -29,6 +35,12 @@ class DictionaryQuery {
   void close();
 
  private:
-  std::vector<sqlite3*> dicts_;
-  std::vector<sqlite3*> freq_dicts_;
+  struct Dictionary {
+    std::string name;
+    sqlite3* db;
+    sqlite3_stmt* stmt;
+  };
+  static std::string decompress_glossary(const void* data, size_t size);
+  std::vector<Dictionary> dicts_;
+  std::vector<Dictionary> freq_dicts_;
 };

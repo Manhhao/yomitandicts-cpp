@@ -14,6 +14,7 @@ add_executable(yomitandicts-cpp
     src/import/importer.cpp
     src/import/json/json_parser.cpp
     src/deinflector/deinflector.cpp
+    src/query/query.cpp
     cli/main.cpp
 )
 

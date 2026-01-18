@@ -2,13 +2,15 @@
 #include <string>
 #include <chrono>
 
-#include "../src/deinflector/deinflector.hpp"
-#include "../src/import/importer.hpp"
+#include "deinflector/deinflector.hpp"
+#include "import/importer.hpp"
+#include "query/query.hpp"
 
 void print_usage(const char* program) {
   std::cout << "Usage:\n";
   std::cout << program << " import <path/to/dictionary.zip>\n";
   std::cout << program << " deinflect <word>\n";
+  std::cout << program << " query <path/to/database.db> <word>\n";
 }
 
 void cmd_import(const std::string& path) {
@@ -49,6 +51,25 @@ void cmd_deinflect(const std::string& word) {
   }
 }
 
+void cmd_query(const std::string& db_path, const std::string& expression) {
+  DictionaryQuery dict_query;
+  dict_query.add_dict(db_path);
+  auto result = dict_query.query(expression);
+
+  std::cout << "query results for: " << expression << "\n";
+  std::cout << result.size() << " entries\n";
+  for (const auto& r : result) {
+    std::cout << "---------------------------------------------------------------\n";
+    std::cout << r.expression << " " << r.reading << " " << r.definition_tags <<"\n";
+    std::cout << r.glossaries.size() << " glossary entries\n";
+    for (const auto& g : r.glossaries) {
+      std::cout << "------\n";
+      std::cout << g.dict_name << "\n";
+      std::cout << g.glossary << "\n";
+    }
+  }
+}
+
 int main(int argc, char* argv[]) {
   if (argc < 3) {
     print_usage(argv[0]);
@@ -62,6 +83,12 @@ int main(int argc, char* argv[]) {
     cmd_import(argv[2]);
   } else if (command == "deinflect") {
     cmd_deinflect(argv[2]);
+  } else if (command == "query") {
+    if (argc < 4) {
+      print_usage(argv[0]);
+      return 1;
+    }
+    cmd_query(argv[2], argv[3]);
   } else {
     std::cerr << "unknown command: " << command << "\n";
     print_usage(argv[0]);
