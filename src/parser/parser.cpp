@@ -7,9 +7,9 @@ bool is_digit(char c) { return c >= '0' && c <= '9'; }
 
 YomitanJSONParser::YomitanJSONParser(std::string_view content) : src_(content), pos_(0) {
   consume_bom();
-  size_t firstChar = src_.find_first_not_of(" \t\n\r", pos_);
-  if (firstChar != std::string_view::npos && src_[firstChar] == '[') {
-    pos_ = firstChar + 1;
+  size_t first_char = src_.find_first_not_of(" \t\n\r", pos_);
+  if (first_char != std::string_view::npos && src_[first_char] == '[') {
+    pos_ = first_char + 1;
   }
 }
 
