@@ -19,7 +19,7 @@ class Deinflector {
  public:
   Deinflector();
   std::vector<DeinflectionResult> deinflect(const std::string& text);
-  uint32_t pos_to_conditions(const std::vector<std::string>& parts_of_speech);
+  static uint32_t pos_to_conditions(const std::vector<std::string>& parts_of_speech);
 
  private:
   struct Rule {

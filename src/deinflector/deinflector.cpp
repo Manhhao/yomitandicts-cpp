@@ -882,33 +882,7 @@ std::vector<DeinflectionResult> Deinflector::deinflect(const std::string& text) 
   return result;
 }
 
-enum Conditions : uint32_t {
-  NONE = 0,
-  V = 1 << 0,
-  V1 = 1 << 1,
-  V1D = 1 << 2,
-  V1P = 1 << 3,
-  V5 = 1 << 4,
-  V5D = 1 << 5,
-  V5S = 1 << 6,
-  V5SS = 1 << 7,
-  V5SP = 1 << 8,
-  VK = 1 << 9,
-  VS = 1 << 10,
-  VZ = 1 << 11,
-  ADJ_I = 1 << 12,
-  MASU = 1 << 13,
-  MASEN = 1 << 14,
-  TE = 1 << 15,
-  BA = 1 << 16,
-  KU = 1 << 17,
-  TA = 1 << 18,
-  NN = 1 << 19,
-  NASAI = 1 << 20,
-  YA = 1 << 21
-};
-
-uint32_t pos_to_conditions(const std::vector<std::string>& parts_of_speech) {
+uint32_t Deinflector::pos_to_conditions(const std::vector<std::string>& parts_of_speech) {
   uint32_t result = 0;
   for (const auto& p : parts_of_speech) {
     if (p.starts_with("v")) {
