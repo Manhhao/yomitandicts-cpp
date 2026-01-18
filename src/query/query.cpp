@@ -1,5 +1,4 @@
 #include "query.hpp"
-#include <vector>
 
 void DictionaryQuery::add_dict(const std::string& db_path) {
     sqlite3* db;

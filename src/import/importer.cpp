@@ -1,11 +1,9 @@
 #include "importer.hpp"
 
-#include <sqlite3.h>
 #include <zip.h>
 #include <zstd.h>
 
 #include <filesystem>
-#include <vector>
 
 #include "../parser/parser.hpp"
 
