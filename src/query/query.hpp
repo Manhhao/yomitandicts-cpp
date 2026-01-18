@@ -30,7 +30,8 @@ class DictionaryQuery {
   void add_dict(const std::string& db_path);
   void add_freq_dict(const std::string& db_path);
 
-  std::vector<TermResult> query(const std::string& expression);
+  std::vector<TermResult> query(const std::string& expression) const;
+  void query_freq(std::vector<TermResult>& terms) const;
 
   void close();
 

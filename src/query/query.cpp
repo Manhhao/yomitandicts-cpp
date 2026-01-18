@@ -23,8 +23,9 @@ void DictionaryQuery::add_dict(const std::string& db_path) {
     return;
   }
   sqlite3_stmt* stmt;
-  if (sqlite3_prepare_v2(db, "SELECT expression, reading, glossary, rules FROM terms WHERE expression = ?", -1, &stmt,
-                         nullptr) != SQLITE_OK) {
+  if (sqlite3_prepare_v2(db,
+                         "SELECT expression, reading, glossary, rules FROM terms WHERE expression = ? OR reading = ?",
+                         -1, &stmt, nullptr) != SQLITE_OK) {
     sqlite3_close(db);
     return;
   }
@@ -46,10 +47,11 @@ void DictionaryQuery::add_freq_dict(const std::string& db_path) {
   freq_dicts_.emplace_back(name, db, stmt);
 }
 
-std::vector<TermResult> DictionaryQuery::query(const std::string& expression) {
+std::vector<TermResult> DictionaryQuery::query(const std::string& expression) const {
   std::unordered_map<std::string, TermResult> term_map;
-  for (auto& [name, db, stmt] : dicts_) {
+  for (const auto& [name, db, stmt] : dicts_) {
     sqlite3_bind_text(stmt, 1, expression.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, expression.c_str(), -1, SQLITE_STATIC);
     while (sqlite3_step(stmt) == SQLITE_ROW) {
       std::string expr = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
       std::string reading = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
@@ -67,7 +69,18 @@ std::vector<TermResult> DictionaryQuery::query(const std::string& expression) {
 
       auto [it, inserted] = term_map.try_emplace(key);
       if (inserted) {
-        it->second = {.expression = expr, .reading = reading, .definition_tags = definition_tags, .glossaries = {}, .frequencies = {}};
+        it->second = {.expression = expr,
+                      .reading = reading,
+                      .definition_tags = definition_tags,
+                      .glossaries = {},
+                      .frequencies = {}};
+      } else {
+        if (!definition_tags.empty()) {
+          if (!it->second.definition_tags.empty()) {
+            it->second.definition_tags += " ";
+          }
+          it->second.definition_tags += definition_tags;
+        }
       }
       it->second.glossaries.push_back(std::move(entry));
     }
@@ -80,10 +93,15 @@ std::vector<TermResult> DictionaryQuery::query(const std::string& expression) {
     results.push_back(std::move(term));
   }
 
-  for (auto& term : results) {
-    for (auto& [name, db, stmt] : freq_dicts_) {
-      sqlite3_bind_text(stmt, 1, term.expression.c_str(), -1, SQLITE_STATIC);
+  query_freq(results);
 
+  return results;
+}
+
+void DictionaryQuery::query_freq(std::vector<TermResult>& terms) const {
+  for (auto& term : terms) {
+    for (const auto& [name, db, stmt] : freq_dicts_) {
+      sqlite3_bind_text(stmt, 1, term.expression.c_str(), -1, SQLITE_STATIC);
       while (sqlite3_step(stmt) == SQLITE_ROW) {
         const char* data = (const char*)sqlite3_column_text(stmt, 0);
         term.frequencies.push_back({name, data ? data : ""});
@@ -91,8 +109,6 @@ std::vector<TermResult> DictionaryQuery::query(const std::string& expression) {
       sqlite3_reset(stmt);
     }
   }
-
-  return results;
 }
 
 std::string DictionaryQuery::decompress_glossary(const void* data, size_t size) {
