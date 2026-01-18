@@ -13,6 +13,7 @@ find_package(libzip REQUIRED)
 add_executable(yomitandicts-cpp
     src/import/importer.cpp
     src/parser/parser.cpp
+    src/deinflector/deinflector.cpp
     cli/main.cpp
 )
 
