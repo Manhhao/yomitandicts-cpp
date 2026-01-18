@@ -5,7 +5,7 @@
 
 #include <filesystem>
 
-#include "../parser/parser.hpp"
+#include "json/json_parser.hpp"
 
 namespace {
 std::string read_file_by_index(zip_t* archive, zip_uint64_t index) {
