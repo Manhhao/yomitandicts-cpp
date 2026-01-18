@@ -4,6 +4,12 @@
 
 #include <string>
 #include <vector>
+#include <unordered_map>
+
+struct DictionaryStyle {
+  std::string dict_name;
+  std::string styles;
+};
 
 struct GlossaryEntry {
   std::string dict_name;
@@ -33,11 +39,12 @@ class DictionaryQuery {
   std::vector<TermResult> query(const std::string& expression) const;
   void query_freq(std::vector<TermResult>& terms) const;
 
-  void close();
+  std::vector<DictionaryStyle> get_styles() const;
 
  private:
   struct Dictionary {
     std::string name;
+    std::string styles;
     sqlite3* db;
     sqlite3_stmt* stmt;
   };
