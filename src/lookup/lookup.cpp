@@ -4,8 +4,6 @@
 #include <map>
 #include <sstream>
 
-#include "deinflector/deinflector.hpp"
-#include "query/query.hpp"
 #include "utf8.hpp"
 
 namespace {

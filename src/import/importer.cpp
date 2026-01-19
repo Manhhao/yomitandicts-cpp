@@ -1,5 +1,6 @@
 #include "importer.hpp"
 
+#include <sqlite3.h>
 #include <zip.h>
 #include <zstd.h>
 

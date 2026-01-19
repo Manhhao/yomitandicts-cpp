@@ -1,10 +1,10 @@
 #pragma once
 
-#include <sqlite3.h>
-
 #include <string>
 #include <vector>
-#include <unordered_map>
+
+struct sqlite3;
+struct sqlite3_stmt;
 
 struct DictionaryStyle {
   std::string dict_name;
