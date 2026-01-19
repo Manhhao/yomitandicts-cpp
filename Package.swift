@@ -15,7 +15,12 @@ let package = Package(
             name: "Czip",
             path: "external/zip/src",
             sources: ["zip.c"],
-            publicHeadersPath: "."
+            publicHeadersPath: ".",
+            cSettings: [
+                .define("ZIP_SHARED"),
+                .define("ZIP_BUILD_SHARED"),
+                .define("MINIZ_EXPORT", to: "__attribute__((visibility(\"hidden\")))"),
+            ]
         ),
         .target(
             name: "CYomitanDicts",
@@ -29,6 +34,9 @@ let package = Package(
             cxxSettings: [
                 .headerSearchPath("include"),
                 .headerSearchPath("external/zip/src"),
+            ],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx)
             ],
             linkerSettings: [
                 .linkedLibrary("sqlite3")
