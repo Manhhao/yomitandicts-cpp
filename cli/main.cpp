@@ -2,11 +2,11 @@
 #include <iostream>
 #include <string>
 
-#include "deinflector/deinflector.hpp"
-#include "import/importer.hpp"
-#include "lookup/lookup.hpp"
-#include "query/query.hpp"
-#include "utf8.hpp"
+#include "yomitandicts/deinflector.hpp"
+#include "yomitandicts/importer.hpp"
+#include "yomitandicts/lookup.hpp"
+#include "yomitandicts/query.hpp"
+#include "../src/utf8.hpp"
 
 void print_usage(const char* program) {
   std::cout << "Usage:\n";

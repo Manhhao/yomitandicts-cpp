@@ -1,4 +1,4 @@
-#include "query.hpp"
+#include "yomitandicts/query.hpp"
 
 #include <sqlite3.h>
 #include <zstd.h>
@@ -171,7 +171,7 @@ std::string DictionaryQuery::decompress_glossary(const void* data, size_t size) 
 
 std::vector<DictionaryStyle> DictionaryQuery::get_styles() const {
   std::vector<DictionaryStyle> styles;
-  styles.reserve(dicts_.size()); 
+  styles.reserve(dicts_.size());
   for (const auto& d : dicts_) {
     if (!d.styles.empty()) {
       styles.emplace_back(d.name, d.styles);

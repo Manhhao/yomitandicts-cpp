@@ -3,8 +3,8 @@
 #include <string>
 #include <vector>
 
-#include "../deinflector/deinflector.hpp"
-#include "../query/query.hpp"
+#include "deinflector.hpp"
+#include "query.hpp"
 
 struct LookupResult {
   std::string matched;

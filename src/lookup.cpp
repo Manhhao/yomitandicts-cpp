@@ -1,4 +1,4 @@
-#include "lookup.hpp"
+#include "yomitandicts/lookup.hpp"
 
 #include <algorithm>
 #include <map>

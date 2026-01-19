@@ -1,4 +1,4 @@
-#include "deinflector.hpp"
+#include "yomitandicts/deinflector.hpp"
 
 #include <algorithm>
 
