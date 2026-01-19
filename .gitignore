@@ -42,7 +42,11 @@
 
 # directories
 build/
+.build/
 .cache/
 
 # macos ds_store
 .DS_Store
+
+# Swift 
+Package.resolved
