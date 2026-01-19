@@ -5,56 +5,77 @@
 #include <zstd.h>
 
 #include <filesystem>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #include "json/json_parser.hpp"
 
 namespace {
-std::string read_file_by_index(zip_t* archive, zip_uint64_t index) {
-  zip_stat_t stat;
-  if (zip_stat_index(archive, index, 0, &stat) != 0) {
+std::string read_file_by_index(zip_t* archive, int index) {
+  if (zip_entry_openbyindex(archive, index) != 0) {
     return "";
   }
 
-  if (!(stat.valid & ZIP_STAT_SIZE)) {
+  void* buf = nullptr;
+  size_t size = 0;
+  ssize_t bytes_read = zip_entry_read(archive, &buf, &size);
+  zip_entry_close(archive);
+
+  if (bytes_read < 0 || !buf) {
+    if (buf) {
+      free(buf);
+    }
     return "";
   }
 
-  zip_file_t* file = zip_fopen_index(archive, index, 0);
-  if (!file) {
-    return "";
-  }
-
-  std::string buffer;
-  buffer.resize(stat.size);
-
-  zip_int64_t bytes_read = zip_fread(file, buffer.data(), stat.size);
-  zip_fclose(file);
-
-  if (bytes_read < 0 || static_cast<zip_uint64_t>(bytes_read) != stat.size) {
-    return "";
-  }
-
+  std::string buffer(static_cast<char*>(buf), size);
+  free(buf);
   return buffer;
 }
 
-std::vector<zip_uint64_t> get_files(zip_t* archive, std::string_view prefix) {
-  std::vector<zip_uint64_t> indices;
-  zip_int64_t num_entries = zip_get_num_entries(archive, 0);
+std::string read_file_by_name(zip_t* archive, const char* name) {
+  if (zip_entry_open(archive, name) != 0) {
+    return "";
+  }
+
+  void* buf = nullptr;
+  size_t size = 0;
+  ssize_t bytes_read = zip_entry_read(archive, &buf, &size);
+  zip_entry_close(archive);
+
+  if (bytes_read < 0 || !buf) {
+    if (buf) {
+      free(buf);
+    }
+    return "";
+  }
+
+  std::string buffer(static_cast<char*>(buf), size);
+  free(buf);
+  return buffer;
+}
+
+std::vector<int> get_files(zip_t* archive, std::string_view prefix) {
+  std::vector<int> indices;
+  ssize_t num_entries = zip_entries_total(archive);
   if (num_entries < 0) {
     return indices;
   }
 
-  for (zip_int64_t i = 0; i < num_entries; ++i) {
-    const char* raw_name = zip_get_name(archive, i, 0);
-    if (!raw_name) {
+  for (int i = 0; i < num_entries; ++i) {
+    if (zip_entry_openbyindex(archive, i) != 0) {
       continue;
     }
 
-    std::string_view name(raw_name);
-
-    if (name.starts_with(prefix)) {
-      indices.push_back(static_cast<zip_uint64_t>(i));
+    const char* raw_name = zip_entry_name(archive);
+    if (raw_name != nullptr) {
+      std::string_view name(raw_name);
+      if (name.starts_with(prefix)) {
+        indices.push_back(i);
+      }
     }
+    zip_entry_close(archive);
   }
 
   return indices;
@@ -104,7 +125,7 @@ void store_index(sqlite3* db, const Index& index, const std::string& styles) {
   sqlite3_finalize(stmt);
 }
 
-void store_terms(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& files, ImportResult& result) {
+void store_terms(sqlite3* db, zip_t* archive, const std::vector<int>& files, ImportResult& result) {
   if (files.empty()) {
     return;
   }
@@ -113,7 +134,7 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& f
   sqlite3_prepare_v2(db, "INSERT INTO terms VALUES (?, ?, ?, ?, ?, ?, ?, ?)", -1, &stmt, nullptr);
 
   Term term;
-  for (const auto& index : files) {
+  for (int index : files) {
     std::string content = read_file_by_index(archive, index);
     if (content.empty()) {
       continue;
@@ -141,7 +162,7 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& f
   sqlite3_finalize(stmt);
 }
 
-void store_meta(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& files, ImportResult& result) {
+void store_meta(sqlite3* db, zip_t* archive, const std::vector<int>& files, ImportResult& result) {
   if (files.empty()) {
     return;
   }
@@ -149,7 +170,7 @@ void store_meta(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& fi
   sqlite3_stmt* stmt;
   sqlite3_prepare_v2(db, "INSERT INTO term_meta VALUES (?, ?, ?)", -1, &stmt, nullptr);
   Meta meta;
-  for (const auto& index : files) {
+  for (int index : files) {
     std::string content = read_file_by_index(archive, index);
     if (content.empty()) {
       continue;
@@ -169,7 +190,7 @@ void store_meta(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& fi
   sqlite3_finalize(stmt);
 }
 
-void store_tags(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& files, ImportResult& result) {
+void store_tags(sqlite3* db, zip_t* archive, const std::vector<int>& files, ImportResult& result) {
   if (files.empty()) {
     return;
   }
@@ -177,7 +198,7 @@ void store_tags(sqlite3* db, zip_t* archive, const std::vector<zip_uint64_t>& fi
   sqlite3_stmt* stmt;
   sqlite3_prepare_v2(db, "INSERT INTO tags VALUES (?, ?, ?, ?, ?)", -1, &stmt, nullptr);
   Tag tag;
-  for (const auto& index : files) {
+  for (int index : files) {
     std::string content = read_file_by_index(archive, index);
     if (content.empty()) {
       continue;
@@ -205,19 +226,14 @@ ImportResult dictionary_importer::import(const std::string& zip_path) {
   zip_t* archive = nullptr;
   sqlite3* db = nullptr;
   try {
-    archive = zip_open(zip_path.c_str(), ZIP_RDONLY, nullptr);
+    archive = zip_open(zip_path.c_str(), 0, 'r');
     if (!archive) {
       throw std::runtime_error("failed to open zip");
     }
 
-    zip_int64_t index_pos = zip_name_locate(archive, "index.json", 0);
-    if (index_pos < 0) {
-      throw std::runtime_error("could not find index.json");
-    }
-
-    std::string index_content = read_file_by_index(archive, index_pos);
+    std::string index_content = read_file_by_name(archive, "index.json");
     if (index_content.empty()) {
-      throw std::runtime_error("index.json is empty");
+      throw std::runtime_error("could not find or read index.json");
     }
 
     Index index;
@@ -239,8 +255,7 @@ ImportResult dictionary_importer::import(const std::string& zip_path) {
 
     init_db(db);
 
-    zip_int64_t styles_pos = zip_name_locate(archive, "styles.css", 0);
-    std::string styles = (styles_pos >= 0) ? read_file_by_index(archive, styles_pos) : "";
+    std::string styles = read_file_by_name(archive, "styles.css");
 
     store_index(db, index, styles);
 

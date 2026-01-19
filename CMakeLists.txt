@@ -4,11 +4,12 @@ project(yomitan-dict-import LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON) 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(SQLite3 REQUIRED)
 find_package(zstd REQUIRED)
-find_package(libzip REQUIRED)
+
+add_subdirectory(external/zip)
 
 add_library(yomitandicts
     src/importer.cpp
@@ -23,7 +24,7 @@ target_include_directories(yomitandicts PUBLIC
 )
 
 target_link_libraries(yomitandicts PRIVATE
-    libzip::zip
+    zip
     SQLite::SQLite3
     zstd::libzstd_static
 )
