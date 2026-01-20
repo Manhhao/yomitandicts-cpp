@@ -13,5 +13,5 @@ struct ImportResult {
 };
 
 namespace dictionary_importer {
-ImportResult import(const std::string& zip_path);
+ImportResult import(const std::string& zip_path, const std::string& output_dir);
 };

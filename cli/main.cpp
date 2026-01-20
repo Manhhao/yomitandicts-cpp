@@ -1,12 +1,13 @@
 #include <chrono>
+#include <filesystem>
 #include <iostream>
 #include <string>
 
+#include "../src/utf8.hpp"
 #include "yomitandicts/deinflector.hpp"
 #include "yomitandicts/importer.hpp"
 #include "yomitandicts/lookup.hpp"
 #include "yomitandicts/query.hpp"
-#include "../src/utf8.hpp"
 
 void print_usage(const char* program) {
   std::cout << "Usage:\n";
@@ -17,7 +18,12 @@ void print_usage(const char* program) {
 }
 
 void cmd_import(const std::string& path) {
-  ImportResult result = dictionary_importer::import(path);
+  std::filesystem::path zip_path(path);
+  std::string output_dir = zip_path.parent_path().string();
+  if (output_dir.empty()) {
+    output_dir = ".";
+  }
+  ImportResult result = dictionary_importer::import(path, output_dir);
 
   if (result.success) {
     std::cout << "title: " << result.title << "\n";

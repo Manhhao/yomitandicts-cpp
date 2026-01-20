@@ -221,7 +221,7 @@ void store_tags(sqlite3* db, zip_t* archive, const std::vector<int>& files, Impo
 }
 }
 
-ImportResult dictionary_importer::import(const std::string& zip_path) {
+ImportResult dictionary_importer::import(const std::string& zip_path, const std::string& output_dir) {
   ImportResult result;
   zip_t* archive = nullptr;
   sqlite3* db = nullptr;
@@ -244,7 +244,10 @@ ImportResult dictionary_importer::import(const std::string& zip_path) {
 
     result.title = index.title;
 
-    std::string path = result.title + ".db";
+    std::filesystem::create_directories(output_dir);
+    std::filesystem::path db_path = std::filesystem::path(output_dir) / (result.title + ".db");
+    std::string path = db_path.string();
+
     if (std::filesystem::exists(path)) {
       std::filesystem::remove(path);
     }
