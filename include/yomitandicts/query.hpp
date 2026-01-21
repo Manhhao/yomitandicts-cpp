@@ -33,6 +33,12 @@ class DictionaryQuery {
  public:
   ~DictionaryQuery();
 
+  DictionaryQuery(const DictionaryQuery&) = delete;
+  DictionaryQuery& operator=(const DictionaryQuery&) = delete;
+
+  DictionaryQuery(DictionaryQuery&&) = default;
+  DictionaryQuery& operator=(DictionaryQuery&&) = default;
+  
   void add_dict(const std::string& db_path);
   void add_freq_dict(const std::string& db_path);
 
