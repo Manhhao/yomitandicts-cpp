@@ -61,7 +61,7 @@ void cmd_deinflect(const std::string& inflected) {
 }
 
 void cmd_query(const std::string& db_path, const std::string& expression) {
-  DictionaryQuery dict_query;
+  DictionaryQuery dict_query();
   dict_query.add_dict(db_path);
   auto result = dict_query.query(expression);
 

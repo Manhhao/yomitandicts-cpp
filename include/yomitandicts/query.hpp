@@ -31,6 +31,7 @@ struct TermResult {
 
 class DictionaryQuery {
  public:
+  DictionaryQuery() = default;
   ~DictionaryQuery();
 
   DictionaryQuery(const DictionaryQuery&) = delete;
@@ -38,7 +39,7 @@ class DictionaryQuery {
 
   DictionaryQuery(DictionaryQuery&&) = default;
   DictionaryQuery& operator=(DictionaryQuery&&) = default;
-  
+
   void add_dict(const std::string& db_path);
   void add_freq_dict(const std::string& db_path);
 
