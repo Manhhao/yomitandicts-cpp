@@ -1,7 +1,7 @@
 #include "json_parser.hpp"
 
 namespace {
-bool is_whitespace(char c) { return (unsigned char)c <= ' '; }
+bool is_whitespace(char c) { return static_cast<unsigned char>(c) <= ' '; }
 bool is_digit(char c) { return c >= '0' && c <= '9'; }
 }
 

@@ -113,8 +113,8 @@ void init_db(sqlite3* db) {
 void store_index(sqlite3* db, const Index& index, const std::string& styles) {
   sqlite3_stmt* stmt;
   sqlite3_prepare_v2(db, "INSERT INTO info VALUES (?, ?, ?, ?)", -1, &stmt, nullptr);
-  sqlite3_bind_text(stmt, 1, index.title.data(), (int)index.title.size(), SQLITE_STATIC);
-  sqlite3_bind_text(stmt, 2, index.revision.data(), (int)index.revision.size(), SQLITE_STATIC);
+  sqlite3_bind_text(stmt, 1, index.title.data(), static_cast<int>(index.title.size()), SQLITE_STATIC);
+  sqlite3_bind_text(stmt, 2, index.revision.data(), static_cast<int>(index.revision.size()), SQLITE_STATIC);
   sqlite3_bind_int(stmt, 3, index.version);
   if (!styles.empty()) {
     sqlite3_bind_text(stmt, 4, styles.c_str(), -1, SQLITE_STATIC);
@@ -142,17 +142,18 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<int>& files, Imp
 
     YomitanJSONParser parser(content);
     while (parser.parse_term(term)) {
-      sqlite3_bind_text(stmt, 1, term.expression.data(), (int)term.expression.size(), SQLITE_STATIC);
-      sqlite3_bind_text(stmt, 2, term.reading.data(), (int)term.reading.size(), SQLITE_STATIC);
-      sqlite3_bind_text(stmt, 3, term.definition_tags.data(), (int)term.definition_tags.size(), SQLITE_STATIC);
-      sqlite3_bind_text(stmt, 4, term.rules.data(), (int)term.rules.size(), SQLITE_STATIC);
+      sqlite3_bind_text(stmt, 1, term.expression.data(), static_cast<int>(term.expression.size()), SQLITE_STATIC);
+      sqlite3_bind_text(stmt, 2, term.reading.data(), static_cast<int>(term.reading.size()), SQLITE_STATIC);
+      sqlite3_bind_text(stmt, 3, term.definition_tags.data(), static_cast<int>(term.definition_tags.size()),
+                        SQLITE_STATIC);
+      sqlite3_bind_text(stmt, 4, term.rules.data(), static_cast<int>(term.rules.size()), SQLITE_STATIC);
       sqlite3_bind_int(stmt, 5, term.score);
 
       std::vector<char> compressed = compress_glossary(term.glossary.data(), term.glossary.size());
-      sqlite3_bind_blob(stmt, 6, compressed.data(), (int)compressed.size(), SQLITE_TRANSIENT);
+      sqlite3_bind_blob(stmt, 6, compressed.data(), static_cast<int>(compressed.size()), SQLITE_TRANSIENT);
 
       sqlite3_bind_int(stmt, 7, term.sequence);
-      sqlite3_bind_text(stmt, 8, term.term_tags.data(), (int)term.term_tags.size(), SQLITE_STATIC);
+      sqlite3_bind_text(stmt, 8, term.term_tags.data(), static_cast<int>(term.term_tags.size()), SQLITE_STATIC);
 
       sqlite3_step(stmt);
       sqlite3_reset(stmt);
@@ -178,9 +179,9 @@ void store_meta(sqlite3* db, zip_t* archive, const std::vector<int>& files, Impo
 
     YomitanJSONParser parser(content);
     while (parser.parse_meta(meta)) {
-      sqlite3_bind_text(stmt, 1, meta.expression.data(), (int)meta.expression.size(), SQLITE_STATIC);
-      sqlite3_bind_text(stmt, 2, meta.mode.data(), (int)meta.mode.size(), SQLITE_STATIC);
-      sqlite3_bind_text(stmt, 3, meta.data.data(), (int)meta.data.size(), SQLITE_STATIC);
+      sqlite3_bind_text(stmt, 1, meta.expression.data(), static_cast<int>(meta.expression.size()), SQLITE_STATIC);
+      sqlite3_bind_text(stmt, 2, meta.mode.data(), static_cast<int>(meta.mode.size()), SQLITE_STATIC);
+      sqlite3_bind_text(stmt, 3, meta.data.data(), static_cast<int>(meta.data.size()), SQLITE_STATIC);
 
       sqlite3_step(stmt);
       sqlite3_reset(stmt);
@@ -206,10 +207,10 @@ void store_tags(sqlite3* db, zip_t* archive, const std::vector<int>& files, Impo
 
     YomitanJSONParser parser(content);
     while (parser.parse_tag(tag)) {
-      sqlite3_bind_text(stmt, 1, tag.name.data(), (int)tag.name.size(), SQLITE_STATIC);
-      sqlite3_bind_text(stmt, 2, tag.category.data(), (int)tag.category.size(), SQLITE_STATIC);
+      sqlite3_bind_text(stmt, 1, tag.name.data(), static_cast<int>(tag.name.size()), SQLITE_STATIC);
+      sqlite3_bind_text(stmt, 2, tag.category.data(), static_cast<int>(tag.category.size()), SQLITE_STATIC);
       sqlite3_bind_int(stmt, 3, tag.order);
-      sqlite3_bind_text(stmt, 4, tag.notes.data(), (int)tag.notes.size(), SQLITE_STATIC);
+      sqlite3_bind_text(stmt, 4, tag.notes.data(), static_cast<int>(tag.notes.size()), SQLITE_STATIC);
       sqlite3_bind_int(stmt, 5, tag.score);
 
       sqlite3_step(stmt);
