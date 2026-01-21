@@ -915,12 +915,12 @@ uint32_t Deinflector::pos_to_conditions(const std::vector<std::string>& parts_of
 void Deinflector::deinflect_recursive(const std::string& text, uint32_t conditions, std::vector<TransformGroup>& trace,
                                       std::vector<DeinflectionResult>& results) const {
   results.emplace_back(text, conditions, trace);
-  if (text.empty()) {
+  size_t text_len = utf8::length(text);
+  if (text_len <= 1) {
     return;
   }
 
-  size_t text_len = utf8::length(text);
-  for (size_t i = std::min(max_length_, text_len); i > 1; i--) {
+  for (size_t i = std::min(max_length_, text_len); i > 0; i--) {
     size_t prefix_chars = text_len - i;
     size_t prefix_bytes = utf8::byte_position(text, prefix_chars);
 
