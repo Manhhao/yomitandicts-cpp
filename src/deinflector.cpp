@@ -879,7 +879,12 @@ void Deinflector::add_rule(const Rule& rule) {
 std::vector<DeinflectionResult> Deinflector::deinflect(const std::string& text) const {
   std::vector<DeinflectionResult> result{};
   std::vector<TransformGroup> trace{};
-  deinflect_recursive(text, NONE, trace, result);
+  size_t text_len = utf8::length(text);
+  if (text_len > 1) {
+    deinflect_recursive(text, NONE, trace, result);
+  } else {
+    result.emplace_back(text, NONE, trace);
+  }
 
   return result;
 }
