@@ -12,7 +12,7 @@ std::vector<std::string> split_whitespace(const std::string& str) {
   std::istringstream iss(str);
   std::string token;
   while (iss >> token) {
-    result.push_back(token);
+    result.push_back(std::move(token));
   }
   return result;
 }

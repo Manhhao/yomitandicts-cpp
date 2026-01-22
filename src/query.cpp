@@ -54,7 +54,7 @@ void DictionaryQuery::add_dict(const std::string& db_path) {
     sqlite3_close(db);
     return;
   }
-  dicts_.emplace_back(name, styles, db, stmt);
+  dicts_.emplace_back(std::move(name), std::move(styles), db, stmt);
 }
 
 void DictionaryQuery::add_freq_dict(const std::string& db_path) {
@@ -86,7 +86,7 @@ void DictionaryQuery::add_freq_dict(const std::string& db_path) {
     sqlite3_close(db);
     return;
   }
-  freq_dicts_.emplace_back(name, "", db, stmt);
+  freq_dicts_.emplace_back(std::move(name), "", db, stmt);
 }
 
 std::vector<TermResult> DictionaryQuery::query(const std::string& expression) const {
