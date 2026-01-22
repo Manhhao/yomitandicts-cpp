@@ -277,8 +277,8 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
     sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_terms_expression ON terms(expression);", nullptr, nullptr,
                  nullptr);
     sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_terms_reading ON terms(reading);", nullptr, nullptr, nullptr);
-    sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_meta_expression ON term_meta(expression);", nullptr, nullptr,
-                 nullptr);
+    sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_meta_expression_mode ON term_meta(expression, mode);", nullptr,
+                 nullptr, nullptr);
 
     sqlite3_exec(db, "PRAGMA analyze;", nullptr, nullptr, nullptr);
   } catch (const std::exception& e) {

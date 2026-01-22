@@ -6,6 +6,8 @@
 #include <filesystem>
 #include <map>
 
+#include "json/json_parser.hpp"
+
 DictionaryQuery::~DictionaryQuery() {
   for (auto& [name, styles, db, stmt] : dicts_) {
     sqlite3_finalize(stmt);
@@ -79,7 +81,8 @@ void DictionaryQuery::add_freq_dict(const std::string& db_path) {
   }
 
   sqlite3_stmt* stmt;
-  if (sqlite3_prepare_v2(db, "SELECT data FROM term_meta WHERE expression = ?", -1, &stmt, nullptr) != SQLITE_OK) {
+  if (sqlite3_prepare_v2(db, "SELECT data FROM term_meta WHERE expression = ? AND mode = 'freq'", -1, &stmt, nullptr) !=
+      SQLITE_OK) {
     sqlite3_close(db);
     return;
   }
@@ -138,11 +141,26 @@ void DictionaryQuery::query_freq(std::vector<TermResult>& terms) const {
   for (auto& term : terms) {
     for (const auto& [name, styles, db, stmt] : freq_dicts_) {
       sqlite3_bind_text(stmt, 1, term.expression.c_str(), -1, SQLITE_STATIC);
+      std::vector<Frequency> frequencies;
       while (sqlite3_step(stmt) == SQLITE_ROW) {
         const char* data = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
-        term.frequencies.push_back({name, data ? data : ""});
+
+        ParsedFrequency parsed;
+        YomitanJSONParser parser(data);
+
+        if (parser.parse_frequency(parsed)) {
+          if (!parsed.reading.empty() && parsed.reading != term.reading) {
+            continue;
+          }
+          frequencies.emplace_back(
+              Frequency{.value = parsed.value, .display_value = std::string(parsed.display_value)});
+        }
       }
       sqlite3_reset(stmt);
+
+      if (!frequencies.empty()) {
+        term.frequencies.emplace_back(FrequencyEntry{.dict_name = name, .frequencies = std::move(frequencies)});
+      }
     }
   }
 }

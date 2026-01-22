@@ -6,6 +6,11 @@
 struct sqlite3;
 struct sqlite3_stmt;
 
+struct Frequency {
+  int value;
+  std::string display_value;
+};
+
 struct DictionaryStyle {
   std::string dict_name;
   std::string styles;
@@ -18,7 +23,7 @@ struct GlossaryEntry {
 
 struct FrequencyEntry {
   std::string dict_name;
-  std::string data;
+  std::vector<Frequency> frequencies;
 };
 
 struct TermResult {

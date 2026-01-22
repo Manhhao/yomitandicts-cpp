@@ -16,6 +16,17 @@ std::vector<std::string> split_whitespace(const std::string& str) {
   }
   return result;
 }
+
+int get_sort_freq(const TermResult& t) {
+  if (t.frequencies.empty() || t.frequencies[0].frequencies.empty()) {
+    return INT_MAX;
+  }
+  int min_freq = INT_MAX;
+  for (const auto& f : t.frequencies[0].frequencies) {
+    min_freq = std::min(min_freq, f.value);
+  }
+  return min_freq;
+}
 }
 
 std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int max_results, size_t scan_length) const {
@@ -36,10 +47,18 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
         if (it != result_map.end()) {
           // we only need the longest matched form
           if (utf8::length(search_str) > utf8::length(it->second.matched)) {
-            it->second = LookupResult(search_str, deinflection.text, deinflection.trace, term);
+            it->second = LookupResult{.matched = search_str,
+                                      .deinflected = deinflection.text,
+                                      .trace = deinflection.trace,
+                                      .term = term,
+                                      .sort_freq = get_sort_freq(term)};
           }
         } else {
-          result_map.emplace(key, LookupResult(search_str, deinflection.text, deinflection.trace, term));
+          result_map.emplace(key, LookupResult{.matched = search_str,
+                                               .deinflected = deinflection.text,
+                                               .trace = deinflection.trace,
+                                               .term = term,
+                                               .sort_freq = get_sort_freq(term)});
         }
       }
     }

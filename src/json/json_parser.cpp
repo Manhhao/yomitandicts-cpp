@@ -1,5 +1,7 @@
 #include "json_parser.hpp"
 
+#include <string_view>
+
 namespace {
 bool is_whitespace(char c) { return static_cast<unsigned char>(c) <= ' '; }
 bool is_digit(char c) { return c >= '0' && c <= '9'; }
@@ -114,6 +116,47 @@ bool YomitanJSONParser::parse_tag(Tag& out) {
 
   consume_array_end();
   return true;
+}
+
+bool YomitanJSONParser::parse_frequency(ParsedFrequency& out) {
+  if (!expect('{')) {
+    return false;
+  }
+  pos_++;
+
+  int level = 1;
+  while (pos_ < src_.size()) {
+    if (src_[pos_] == '}') {
+      pos_++;
+      level--;
+      if (level == 0) {
+        break;
+      }
+      continue;
+    }
+    std::string_view key = parse_string();
+    if (!expect(':')) {
+      return false;
+    }
+    pos_++;
+    if (key == "reading") {
+      out.reading = parse_string();
+      consume_comma();
+    } else if (key == "frequency") {
+      if (!expect('{')) {
+        return false;
+      }
+      pos_++;
+      level++;
+    } else if (key == "value") {
+      out.value = parse_number();
+      consume_comma();
+    } else if (key == "displayValue") {
+      out.display_value = parse_string();
+      consume_comma();
+    }
+  }
+  return level == 0;
 }
 
 void YomitanJSONParser::consume_bom() {

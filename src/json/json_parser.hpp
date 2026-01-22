@@ -33,6 +33,12 @@ struct Tag {
   int score = 0;
 };
 
+struct ParsedFrequency {
+  std::string_view reading;
+  int value;
+  std::string_view display_value;
+};
+
 class YomitanJSONParser {
  public:
   YomitanJSONParser(std::string_view content);
@@ -40,6 +46,7 @@ class YomitanJSONParser {
   bool parse_term(Term& out);
   bool parse_meta(Meta& out);
   bool parse_tag(Tag& out);
+  bool parse_frequency(ParsedFrequency& out);
 
  private:
   void consume_bom();
