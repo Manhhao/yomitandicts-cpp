@@ -3,7 +3,7 @@
 #include <algorithm>
 
 #include "utf8.hpp"
-Deinflector::Deinflector() { init_transforms(); }
+Deinflector::Deinflector() : max_length_(0) { init_transforms(); }
 
 // rules and descriptions adopted from
 // https://github.com/yomidevs/yomitan/blob/master/ext/js/language/ja/japanese-transforms.js
