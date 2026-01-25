@@ -51,7 +51,9 @@ Creates a Lookup object using a given query with dictionaries added and a deinfl
 ```cpp
 std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int max_results = 16, size_t scan_length = 16) const;
 ```
-Follows a parsing strategy similar to Yomitan. Substrings of `lookup_string` are tested from length `scan_length` down to 1. Each substring is deinflected and queried using the query object. Results are filtered by part-of-speech tags defined in dictionaries, or added directly if none are present. The results are sorted by matched length first, then by the first frequency value if frequency data is available. Sorted results are truncated to `max_results`.
+Follows a parsing strategy similar to Yomitan. Substrings of `lookup_string` are tested from length `scan_length` down to 1. Each substring is deinflected and queried using the query object. 
+
+Results are filtered by part-of-speech tags defined in dictionaries, or added directly if none are present. The results are sorted by matched length first, then by the lowest frequency value of the first frequency entry if frequency data is available. Sorted results are truncated to `max_results`.
 
 ## Acknowledgements
 
