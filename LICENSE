@@ -1,0 +1,16 @@
+The project as a whole is licensed under the GNU General Public License v3.0 (GPLv3).
+
+See LICENSE.GPL for the full text of the GPLv3 License.
+
+EXCEPTION / DUAL LICENSE:
+A part of this source code is also available under the MIT License.
+
+Files subject to GPLv3:
+- src/deinflector.cpp
+- include/yomitandicts/deinflector.hpp
+
+If you wish to use parts of the project under the MIT License, you must:
+1. Remove the GPLv3 restricted files listed above.
+2. Not link against or include the GPLv3 restricted files in your project.
+
+See LICENSE.MIT for the full text of the MIT License.

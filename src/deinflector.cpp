@@ -889,9 +889,9 @@ std::vector<DeinflectionResult> Deinflector::deinflect(const std::string& text) 
   return result;
 }
 
-uint32_t Deinflector::pos_to_conditions(const std::vector<std::string>& parts_of_speech) {
+uint32_t Deinflector::pos_to_conditions(const std::vector<std::string>& part_of_speech) {
   uint32_t result = 0;
-  for (const auto& p : parts_of_speech) {
+  for (const auto& p : part_of_speech) {
     if (p.starts_with("v")) {
       result |= V;
     }

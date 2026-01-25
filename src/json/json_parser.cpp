@@ -57,7 +57,13 @@ bool YomitanJSONParser::parse_term(Term& out) {
   }
   consume_comma();
 
-  out.definition_tags = parse_string();
+  if (expect('"')) {
+    out.definition_tags = parse_string();
+  }
+  else {
+    skip();
+    out.definition_tags = "";
+  }
   consume_comma();
 
   out.rules = parse_string();
@@ -253,17 +259,7 @@ int YomitanJSONParser::parse_number() {
 std::string_view YomitanJSONParser::extract_single_value() {
   consume_whitespace();
   size_t start = pos_;
-  char c = src_[pos_];
-  if (c == '"') {
-    skip_string();
-  } else if (c == '[' || c == '{') {
-    skip_bracket();
-  } else {
-    while (pos_ < src_.size() && src_[pos_] != ',' && src_[pos_] != ']' && src_[pos_] != '}') {
-      pos_++;
-    }
-  }
-
+  skip();
   return src_.substr(start, pos_ - start);
 }
 
