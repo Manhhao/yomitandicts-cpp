@@ -899,7 +899,10 @@ uint32_t Deinflector::pos_to_conditions(const std::vector<std::string>& part_of_
       result |= V1;
     }
     if (p.starts_with("v5")) {
-      result |= V5;
+      result |= V5 | V5D;
+    }
+    if (p == "v5s") {
+      result |= V5S;
     }
     if (p == "vk") {
       result |= VK;
