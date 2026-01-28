@@ -125,6 +125,12 @@ bool YomitanJSONParser::parse_tag(Tag& out) {
 }
 
 bool YomitanJSONParser::parse_frequency(ParsedFrequency& out) {
+  if (pos_ < src_.size() && is_digit(src_[pos_])) {
+    out.value = parse_number();
+    out.display_value = std::to_string(out.value);
+    return true;
+  }
+
   if (!expect('{')) {
     return false;
   }

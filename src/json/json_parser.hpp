@@ -1,7 +1,6 @@
 #pragma once
 #include <string_view>
 #include <vector>
-#include <string>
 
 struct Index {
   std::string_view title;
@@ -38,7 +37,7 @@ struct Tag {
 struct ParsedFrequency {
   std::string_view reading;
   int value;
-  std::string_view display_value;
+  std::string display_value;
 };
 
 struct ParsedPitch {
