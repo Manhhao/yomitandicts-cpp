@@ -165,6 +165,88 @@ bool YomitanJSONParser::parse_frequency(ParsedFrequency& out) {
   return level == 0;
 }
 
+bool YomitanJSONParser::parse_pitch(ParsedPitch& out) {
+  if (!expect('{')) {
+    return false;
+  }
+  pos_++;
+
+  while (pos_ < src_.size() && src_[pos_] != '}') {
+    std::string_view key = parse_string();
+    if (!expect(':')) {
+      return false;
+    }
+    pos_++;
+
+    if (key == "reading") {
+      out.reading = parse_string();
+    } else if (key == "pitches") {
+      if (!parse_pitches_array(out.pitches)) {
+        return false;
+      }
+    } else {
+      skip();
+    }
+    consume_comma();
+  }
+  if (!expect('}')) {
+    return false;
+  }
+  pos_++;
+  return true;
+}
+
+bool YomitanJSONParser::parse_pitches_array(std::vector<int>& pitches) {
+  if (!expect('[')) {
+    return false;
+  }
+  pos_++;
+
+  while (pos_ < src_.size() && src_[pos_] != ']') {
+    int position;
+    if (!parse_pitch_position(position)) {
+      return false;
+    }
+    pitches.push_back(position);
+    consume_comma();
+  }
+  if (!expect(']')) {
+    return false;
+  }
+  pos_++;
+  return true;
+}
+
+bool YomitanJSONParser::parse_pitch_position(int& position) {
+  if (!expect('{')) {
+    return false;
+  }
+  pos_++;
+
+  position = 0;
+  while (pos_ < src_.size() && src_[pos_] != '}') {
+    std::string_view key = parse_string();
+    if (!expect(':')) {
+      return false;
+    }
+    pos_++;
+
+    // there are a a few more keys, in the three most popular dicts (NHK 2016, 大辞泉, アクセント辞典v2) these seem to be empty, will handle eventually
+    if (key == "position") {
+      // according to spec this can be a string as well, haven't found a dict using this yet
+      position = parse_number();
+    } else {
+      skip();
+    }
+    consume_comma();
+  }
+  if (!expect('}')) {
+    return false;
+  }
+  pos_++;
+  return true;
+}
+
 void YomitanJSONParser::consume_bom() {
   if (src_.substr(0, 3) == "\xEF\xBB\xBF") {
     pos_ = 3;

@@ -1,5 +1,7 @@
 #pragma once
 #include <string_view>
+#include <vector>
+#include <string>
 
 struct Index {
   std::string_view title;
@@ -39,6 +41,11 @@ struct ParsedFrequency {
   std::string_view display_value;
 };
 
+struct ParsedPitch {
+  std::string_view reading;
+  std::vector<int> pitches;
+};
+
 class YomitanJSONParser {
  public:
   YomitanJSONParser(std::string_view content);
@@ -47,6 +54,7 @@ class YomitanJSONParser {
   bool parse_meta(Meta& out);
   bool parse_tag(Tag& out);
   bool parse_frequency(ParsedFrequency& out);
+  bool parse_pitch(ParsedPitch& out);
 
  private:
   void consume_bom();
@@ -61,6 +69,8 @@ class YomitanJSONParser {
   void skip();
   void skip_string();
   void skip_bracket();
+  bool parse_pitch_position(int& position);
+  bool parse_pitches_array(std::vector<int>& pitches);
 
   std::string_view src_;
   size_t pos_;
