@@ -11,6 +11,8 @@ find_package(zstd REQUIRED)
 
 add_subdirectory(external/zip)
 
+target_compile_definitions(zip PRIVATE MINIZ_DISABLE_ZIP_READER_CRC32_CHECKS)
+
 add_library(yomitandicts
     src/importer.cpp
     src/json/json_parser.cpp
