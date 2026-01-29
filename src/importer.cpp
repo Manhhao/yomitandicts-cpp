@@ -21,7 +21,6 @@ std::string read_file_by_index(zip_t* archive, int index) {
   size_t size = 0;
   ssize_t bytes_read = zip_entry_read(archive, &buf, &size);
   zip_entry_close(archive);
-
   if (bytes_read < 0 || !buf) {
     if (buf) {
       free(buf);

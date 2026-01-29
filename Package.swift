@@ -20,6 +20,7 @@ let package = Package(
                 .define("ZIP_SHARED"),
                 .define("ZIP_BUILD_SHARED"),
                 .define("MINIZ_EXPORT", to: "__attribute__((visibility(\"hidden\")))"),
+                .define("MINIZ_DISABLE_ZIP_READER_CRC32_CHECKS"),
             ]
         ),
         .target(

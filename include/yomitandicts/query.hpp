@@ -26,12 +26,18 @@ struct FrequencyEntry {
   std::vector<Frequency> frequencies;
 };
 
+struct PitchEntry {
+  std::string dict_name;
+  std::vector<int> pitch_positions;
+};
+
 struct TermResult {
   std::string expression;
   std::string reading;
   std::string definition_tags;
   std::vector<GlossaryEntry> glossaries;
   std::vector<FrequencyEntry> frequencies;
+  std::vector<PitchEntry> pitches;
 };
 
 class DictionaryQuery {
@@ -47,9 +53,9 @@ class DictionaryQuery {
 
   void add_dict(const std::string& db_path);
   void add_freq_dict(const std::string& db_path);
+  void add_pitch_dict(const std::string& db_path);
 
   std::vector<TermResult> query(const std::string& expression) const;
-  void query_freq(std::vector<TermResult>& terms) const;
 
   std::vector<DictionaryStyle> get_styles() const;
 
@@ -60,7 +66,12 @@ class DictionaryQuery {
     sqlite3* db;
     sqlite3_stmt* stmt;
   };
+
+  void query_freq(std::vector<TermResult>& terms) const;
+  void query_pitch(std::vector<TermResult>& terms) const;
+
   static std::string decompress_glossary(const void* data, size_t size);
   std::vector<Dictionary> dicts_;
   std::vector<Dictionary> freq_dicts_;
+  std::vector<Dictionary> pitch_dicts_;
 };
