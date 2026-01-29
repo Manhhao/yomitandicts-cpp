@@ -5,7 +5,6 @@
 
 #include <filesystem>
 #include <map>
-#include <unordered_set>
 
 #include "json/json_parser.hpp"
 
@@ -207,7 +206,7 @@ void DictionaryQuery::query_pitch(std::vector<TermResult>& terms) const {
   for (auto& term : terms) {
     for (const auto& [name, styles, db, stmt] : pitch_dicts_) {
       sqlite3_bind_text(stmt, 1, term.expression.c_str(), -1, SQLITE_STATIC);
-      std::unordered_set<int> pitch_positions;
+      std::vector<int> pitch_positions;
       while (sqlite3_step(stmt) == SQLITE_ROW) {
         const char* data = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
 
@@ -218,7 +217,7 @@ void DictionaryQuery::query_pitch(std::vector<TermResult>& terms) const {
           if (!parsed.reading.empty() && parsed.reading != term.reading) {
             continue;
           }
-          pitch_positions.insert(parsed.pitches.begin(), parsed.pitches.end());
+          pitch_positions.insert(pitch_positions.end(), parsed.pitches.begin(), parsed.pitches.end());
         }
       }
       sqlite3_reset(stmt);

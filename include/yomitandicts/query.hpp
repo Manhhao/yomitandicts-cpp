@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 struct sqlite3;
@@ -29,7 +28,7 @@ struct FrequencyEntry {
 
 struct PitchEntry {
   std::string dict_name;
-  std::unordered_set<int> pitch_positions;
+  std::vector<int> pitch_positions;
 };
 
 struct TermResult {
