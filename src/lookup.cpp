@@ -91,7 +91,8 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
 std::vector<TermResult> Lookup::filter_by_pos(const std::vector<TermResult>& terms, const DeinflectionResult& d) {
   std::vector<TermResult> filtered_results{};
   for (const auto& term : terms) {
-    auto dict_conditions = Deinflector::pos_to_conditions(split_whitespace(term.definition_tags));
+    const auto& pos_source = term.rules.empty() ? term.definition_tags : term.rules;
+    auto dict_conditions = Deinflector::pos_to_conditions(split_whitespace(pos_source));
     // this should support dictionaries without deinflection support because:
     // word needs conditions -> dict has an entry but doesn't have conditions
     // => we give the dict the benefit of the doubt

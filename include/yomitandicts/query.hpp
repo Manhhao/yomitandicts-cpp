@@ -19,6 +19,8 @@ struct DictionaryStyle {
 struct GlossaryEntry {
   std::string dict_name;
   std::string glossary;
+  std::string definition_tags;
+  std::string term_tags;
 };
 
 struct FrequencyEntry {
@@ -35,6 +37,7 @@ struct TermResult {
   std::string expression;
   std::string reading;
   std::string definition_tags;
+  std::string rules;
   std::vector<GlossaryEntry> glossaries;
   std::vector<FrequencyEntry> frequencies;
   std::vector<PitchEntry> pitches;

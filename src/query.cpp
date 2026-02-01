@@ -53,7 +53,8 @@ void DictionaryQuery::add_dict(const std::string& db_path) {
 
   sqlite3_stmt* stmt;
   if (sqlite3_prepare_v2(db,
-                         "SELECT expression, reading, glossary, rules FROM terms WHERE expression = ? OR reading = ?",
+                         "SELECT expression, reading, definition_tags, rules, glossary, term_tags "
+                         "FROM terms WHERE expression = ? OR reading = ?",
                          -1, &stmt, nullptr) != SQLITE_OK) {
     sqlite3_close(db);
     return;
@@ -133,13 +134,17 @@ std::vector<TermResult> DictionaryQuery::query(const std::string& expression) co
     while (sqlite3_step(stmt) == SQLITE_ROW) {
       std::string expr = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
       std::string reading = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
-      std::string definition_tags = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+      std::string definition_tags = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+      std::string rules = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+      std::string term_tags = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
 
       GlossaryEntry entry;
       entry.dict_name = name;
+      entry.definition_tags = definition_tags;
+      entry.term_tags = term_tags;
 
-      const void* blob = sqlite3_column_blob(stmt, 2);
-      int blob_size = sqlite3_column_bytes(stmt, 2);
+      const void* blob = sqlite3_column_blob(stmt, 4);
+      int blob_size = sqlite3_column_bytes(stmt, 4);
       entry.glossary = decompress_glossary(blob, blob_size);
 
       auto [it, inserted] = term_map.try_emplace({expr, reading});
@@ -147,6 +152,7 @@ std::vector<TermResult> DictionaryQuery::query(const std::string& expression) co
         it->second = {.expression = expr,
                       .reading = reading,
                       .definition_tags = definition_tags,
+                      .rules = rules,
                       .glossaries = {},
                       .frequencies = {}};
       } else {
@@ -155,6 +161,12 @@ std::vector<TermResult> DictionaryQuery::query(const std::string& expression) co
             it->second.definition_tags += " ";
           }
           it->second.definition_tags += definition_tags;
+        }
+        if (!rules.empty()) {
+          if (!it->second.rules.empty()) {
+            it->second.rules += " ";
+          }
+          it->second.rules += rules;
         }
       }
       it->second.glossaries.push_back(std::move(entry));
