@@ -155,11 +155,17 @@ bool YomitanJSONParser::parse_frequency(ParsedFrequency& out) {
       out.reading = parse_string();
       consume_comma();
     } else if (key == "frequency") {
-      if (!expect('{')) {
+      consume_whitespace();
+      if (pos_ < src_.size() && is_digit(src_[pos_])) {
+        out.value = parse_number();
+        out.display_value = std::to_string(out.value);
+        consume_comma();
+      } else if (expect('{')) {
+        pos_++;
+        level++;
+      } else {
         return false;
       }
-      pos_++;
-      level++;
     } else if (key == "value") {
       out.value = parse_number();
       consume_comma();

@@ -1,8 +1,11 @@
+#include <sqlite3.h>
+
 #include <chrono>
 #include <filesystem>
 #include <iostream>
 #include <string>
 
+#include "../src/json/json_parser.hpp"
 #include "../src/utf8.hpp"
 #include "yomitandicts/deinflector.hpp"
 #include "yomitandicts/importer.hpp"
@@ -15,6 +18,7 @@ void print_usage(const char* program) {
   std::cout << program << " deinflect <word>\n";
   std::cout << program << " query <path/to/database.db> <word>\n";
   std::cout << program << " lookup <path/to/database.db> <lookup_string>\n";
+  std::cout << program << " freq <path/to/freq.db> <word>\n";
 }
 
 void cmd_import(const std::string& path) {
@@ -77,6 +81,41 @@ void cmd_query(const std::string& db_path, const std::string& expression) {
       std::cout << g.glossary << "\n";
     }
   }
+}
+
+void cmd_freq(const std::string& freq_db, const std::string& expression) {
+  sqlite3* db;
+  if (sqlite3_open_v2(freq_db.c_str(), &db, SQLITE_OPEN_READONLY, nullptr) != SQLITE_OK) {
+    std::cout << "failed to open database\n";
+    return;
+  }
+  sqlite3_stmt* stmt;
+  if (sqlite3_prepare_v2(db, "SELECT expression, data FROM term_meta WHERE expression = ? AND mode = 'freq'", -1, &stmt,
+                         nullptr) != SQLITE_OK) {
+    std::cout << "failed to prepare statement\n";
+    sqlite3_close(db);
+    return;
+  }
+  sqlite3_bind_text(stmt, 1, expression.c_str(), -1, SQLITE_STATIC);
+  std::cout << "frequency entries for: " << expression << "\n";
+  int count = 0;
+  while (sqlite3_step(stmt) == SQLITE_ROW) {
+    const char* expr = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+    const char* data = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+    std::cout << "raw: " << data << "\n";
+    ParsedFrequency parsed;
+    YomitanJSONParser parser(data);
+    if (parser.parse_frequency(parsed)) {
+      std::cout << "parsed: reading=" << parsed.reading << " value=" << parsed.value
+                << " display=" << parsed.display_value << "\n";
+    } else {
+      std::cout << "failed to parse\n";
+    }
+    count++;
+  }
+  std::cout << "entries: " << count << "\n";
+  sqlite3_finalize(stmt);
+  sqlite3_close(db);
 }
 
 void cmd_lookup(const std::vector<std::string>& db_paths, const std::string& lookup_string, int max_results = 8,
@@ -143,6 +182,8 @@ int main(int argc, char* argv[]) {
       db_paths.emplace_back(argv[i]);
     }
     cmd_lookup(db_paths, term);
+  } else if (command == "freq" && argc >= 4) {
+    cmd_freq(argv[2], argv[3]);
   } else {
     std::cerr << "Invalid command or insufficient arguments.\n";
     print_usage(argv[0]);
