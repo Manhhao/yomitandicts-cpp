@@ -5,6 +5,16 @@
 #include "utf8.hpp"
 Deinflector::Deinflector() : max_length_(0) { init_transforms(); }
 
+static constexpr std::string_view shimau_english_description =
+    "1. Shows a sense of regret/surprise when you did have volition in doing something, but it turned out to be bad to "
+    "do.\n"
+    "2. Shows perfective/punctual achievement. This shows that an action has been completed.\n"
+    "3. Shows unintentional action–“accidentally”.\n";
+
+static constexpr std::string_view passive_english_description =
+    "1. Indicates an action received from an action performer.\n"
+    "2. Expresses respect for the subject of action performer.\n";
+
 // rules and descriptions adopted from
 // https://github.com/yomidevs/yomitan/blob/master/ext/js/language/ja/japanese-transforms.js
 void Deinflector::init_transforms() {
@@ -66,7 +76,7 @@ void Deinflector::init_transforms() {
   add_rule({.from = "來ちゃ", .to = "來る", .conditions_in = V5, .conditions_out = VK, .group_id = id});
 
   id = add_group({.name = "-ちゃう",
-                  .description = "Contraction of -しまう.\n"
+                  .description = "Contraction of -しまう.\n" + std::string(shimau_english_description) +
                                  "Usage: Attach しまう after the て-form of verbs, contract てしまう into ちゃう."});
   add_rule({.from = "ちゃう", .to = "る", .conditions_in = V5, .conditions_out = V1, .group_id = id});
   add_rule({.from = "いじゃう", .to = "ぐ", .conditions_in = V5, .conditions_out = V5, .group_id = id});
@@ -87,7 +97,7 @@ void Deinflector::init_transforms() {
   add_rule({.from = "來ちゃう", .to = "來る", .conditions_in = V5, .conditions_out = VK, .group_id = id});
 
   id = add_group({.name = "-ちまう",
-                  .description = "Contraction of -しまう.\n"
+                  .description = "Contraction of -しまう.\n" + std::string(shimau_english_description) +
                                  "Usage: Attach しまう after the て-form of verbs, contract てしまう into ちまう."});
   add_rule({.from = "ちまう", .to = "る", .conditions_in = V5, .conditions_out = V1, .group_id = id});
   add_rule({.from = "いじまう", .to = "ぐ", .conditions_in = V5, .conditions_out = V5, .group_id = id});
@@ -108,12 +118,7 @@ void Deinflector::init_transforms() {
   add_rule({.from = "來ちまう", .to = "來る", .conditions_in = V5, .conditions_out = VK, .group_id = id});
 
   id = add_group({.name = "-しまう",
-                  .description =
-                      "1. Shows a sense of regret/surprise when you did have volition in doing something, but it "
-                      "turned out to be bad to do.\n"
-                      "2. Shows perfective/punctual achievement. This shows that an action has been completed.\n"
-                      "3. Shows unintentional action–“accidentally”.\n"
-                      "Usage: Attach しまう after the て-form of verbs."});
+                  .description = std::string(shimau_english_description) + "Usage: Attach しまう after the て-form of verbs."});
   add_rule({.from = "てしまう", .to = "て", .conditions_in = V5, .conditions_out = TE, .group_id = id});
   add_rule({.from = "でしまう", .to = "で", .conditions_in = V5, .conditions_out = TE, .group_id = id});
 
@@ -630,10 +635,7 @@ void Deinflector::init_transforms() {
   add_rule({.from = "さ", .to = "い", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
 
   id = add_group({.name = "passive",
-                  .description = "1. Expression of being affected by an action (Passive).\n"
-                                 "2. Respectful expression (Honorific).\n"
-                                 "3. Spontaneity.\n"
-                                 "4. Potential.\n"
+                  .description = std::string(passive_english_description) +
                                  "Usage: Attach れる to the irrealis form (未然形) of godan verbs."});
   add_rule({.from = "かれる", .to = "く", .conditions_in = V1, .conditions_out = V5, .group_id = id});
   add_rule({.from = "がれる", .to = "ぐ", .conditions_in = V1, .conditions_out = V5, .group_id = id});
@@ -727,11 +729,8 @@ void Deinflector::init_transforms() {
   add_rule({.from = "來れる", .to = "來る", .conditions_in = V1, .conditions_out = VK, .group_id = id});
 
   id = add_group({.name = "potential or passive",
-                  .description = "1. Expression of being affected by an action (Passive).\n"
-                                 "2. Respectful expression (Honorific).\n"
-                                 "3. Spontaneity.\n"
-                                 "4. Potential.\n"
-                                 "5. Indicates a state of being (naturally) capable of doing an action.\n"
+                  .description = std::string(passive_english_description) +
+                                 "3. Indicates a state of being (naturally) capable of doing an action.\n"
                                  "Usage: Attach られる to the irrealis form (未然形) of ichidan verbs.\n"
                                  "する becomes せられる, くる becomes こられる"});
   add_rule({.from = "られる", .to = "る", .conditions_in = V1, .conditions_out = V1, .group_id = id});
@@ -892,28 +891,17 @@ std::vector<DeinflectionResult> Deinflector::deinflect(const std::string& text) 
 uint32_t Deinflector::pos_to_conditions(const std::vector<std::string>& part_of_speech) {
   uint32_t result = 0;
   for (const auto& p : part_of_speech) {
-    if (p.starts_with("v")) {
-      result |= V;
-    }
-    if (p.starts_with("v1")) {
-      result |= V1 | V1D;
-    }
-    if (p.starts_with("v5")) {
-      result |= V5 | V5D;
-    }
-    if (p == "v5s") {
-      result |= V5S;
-    }
-    if (p == "vk") {
+    if (p == "v1") {
+      result |= V1;
+    } else if (p == "v5") {
+      result |= V5;
+    } else if (p == "vk") {
       result |= VK;
-    }
-    if (p == "vs") {
+    } else if (p == "vs") {
       result |= VS;
-    }
-    if (p == "vz") {
+    } else if (p == "vz") {
       result |= VZ;
-    }
-    if (p == "adj-i") {
+    } else if (p == "adj-i") {
       result |= ADJ_I;
     }
   }
