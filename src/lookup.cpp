@@ -78,6 +78,12 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
       return len_a > len_b;
     }
 
+    auto trace_len_a = a.trace.size();
+    auto trace_len_b = b.trace.size();
+    if (trace_len_a != trace_len_b) {
+      return trace_len_a < trace_len_b;
+    }
+
     return a.sort_freq < b.sort_freq;
   });
 
