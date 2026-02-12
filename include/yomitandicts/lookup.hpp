@@ -11,7 +11,6 @@ struct LookupResult {
   std::string deinflected;
   std::vector<TransformGroup> trace;
   TermResult term;
-  int sort_freq;
 };
 
 class Lookup {

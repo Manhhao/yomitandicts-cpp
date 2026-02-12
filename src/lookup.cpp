@@ -17,15 +17,34 @@ std::vector<std::string> split_whitespace(const std::string& str) {
   return result;
 }
 
-int get_sort_freq(const TermResult& t) {
-  if (t.frequencies.empty() || t.frequencies[0].frequencies.empty()) {
-    return INT_MAX;
+int get_freq_value_for_dict(const TermResult& term, const std::string& dict_name) {
+  for (const auto& frequency_entry : term.frequencies) {
+    if (frequency_entry.dict_name != dict_name) {
+      continue;
+    }
+
+    int min_frequency = INT_MAX;
+    for (const auto& frequency : frequency_entry.frequencies) {
+      if (frequency.value >= 0) {
+        min_frequency = std::min(min_frequency, frequency.value);
+      }
+    }
+    return min_frequency;
   }
-  int min_freq = INT_MAX;
-  for (const auto& f : t.frequencies[0].frequencies) {
-    min_freq = std::min(min_freq, f.value);
+
+  return INT_MAX;
+}
+
+bool freq_sort_order(const LookupResult& a, const LookupResult& b, const std::vector<std::string>& freq_dict_order) {
+  for (const auto& dict_name : freq_dict_order) {
+    const int freq_a = get_freq_value_for_dict(a.term, dict_name);
+    const int freq_b = get_freq_value_for_dict(b.term, dict_name);
+    if (freq_a != freq_b) {
+      return freq_a < freq_b;
+    }
   }
-  return min_freq;
+
+  return false;
 }
 }
 
@@ -50,15 +69,13 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
             it->second = LookupResult{.matched = search_str,
                                       .deinflected = deinflection.text,
                                       .trace = deinflection.trace,
-                                      .term = term,
-                                      .sort_freq = get_sort_freq(term)};
+                                      .term = term};
           }
         } else {
           result_map.emplace(key, LookupResult{.matched = search_str,
                                                .deinflected = deinflection.text,
                                                .trace = deinflection.trace,
-                                               .term = term,
-                                               .sort_freq = get_sort_freq(term)});
+                                               .term = term});
         }
       }
     }
@@ -70,8 +87,9 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
     results.push_back(std::move(result));
   }
 
+  const auto freq_dict_order = query_.get_freq_dict_order();
   auto middle_iter = std::ranges::next(results.begin(), max_results, results.end());
-  std::ranges::partial_sort(results, middle_iter, [](const auto& a, const auto& b) {
+  std::ranges::partial_sort(results, middle_iter, [&freq_dict_order](const auto& a, const auto& b) {
     auto len_a = utf8::length(a.matched);
     auto len_b = utf8::length(b.matched);
     if (len_a != len_b) {
@@ -84,7 +102,7 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
       return trace_len_a < trace_len_b;
     }
 
-    return a.sort_freq < b.sort_freq;
+    return freq_sort_order(a, b, freq_dict_order);
   });
 
   if (results.size() > max_results) {

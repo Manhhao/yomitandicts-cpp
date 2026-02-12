@@ -273,3 +273,12 @@ std::vector<DictionaryStyle> DictionaryQuery::get_styles() const {
   }
   return styles;
 }
+
+std::vector<std::string> DictionaryQuery::get_freq_dict_order() const {
+  std::vector<std::string> names;
+  names.reserve(freq_dicts_.size());
+  for (const auto& d : freq_dicts_) {
+    names.push_back(d.name);
+  }
+  return names;
+}

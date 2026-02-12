@@ -61,6 +61,7 @@ class DictionaryQuery {
   std::vector<TermResult> query(const std::string& expression) const;
 
   std::vector<DictionaryStyle> get_styles() const;
+  std::vector<std::string> get_freq_dict_order() const;
 
  private:
   struct Dictionary {
