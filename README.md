@@ -57,10 +57,11 @@ Results are filtered by part-of-speech tags defined in dictionaries, or added di
 
 ## Acknowledgements
 
-- [Yomitan](https://github.com/yomidevs/yomitan): Dictionary format, Japanese deinflection rules and descriptions. GPLv3
+- [Yomitan](https://github.com/yomidevs/yomitan): Dictionary format, Japanese deinflection rules and descriptions, Japanese preprocessor GPLv3
 - [SQLite](https://sqlite.org/): Unlicensed
 - [zstd](https://github.com/facebook/zstd): BSD
 - [kuba--/zip](https://github.com/kuba--/zip): MIT
+- [utfcpp](https://github.com/nemtrif/utfcpp): BSL-1.0
 
 ## License
 See [LICENSE](LICENSE) for details.
