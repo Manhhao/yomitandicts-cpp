@@ -35,6 +35,7 @@ let package = Package(
             cxxSettings: [
                 .headerSearchPath("include"),
                 .headerSearchPath("external/zip/src"),
+                .headerSearchPath("external/utfcpp/source"),
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx)
