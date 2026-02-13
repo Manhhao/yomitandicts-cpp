@@ -6,6 +6,7 @@
 #include <string>
 
 #include "../src/json/json_parser.hpp"
+#include "../src/preprocessor/text_processor.hpp"
 #include "../src/utf8.hpp"
 #include "yomitandicts/deinflector.hpp"
 #include "yomitandicts/importer.hpp"
@@ -16,6 +17,7 @@ void print_usage(const char* program) {
   std::cout << "Usage:\n";
   std::cout << program << " import <path/to/dictionary.zip>\n";
   std::cout << program << " deinflect <word>\n";
+  std::cout << program << " preprocess <word>\n";
   std::cout << program << " query <path/to/database.db> <word>\n";
   std::cout << program << " lookup <path/to/database.db> <lookup_string>\n";
   std::cout << program << " freq <path/to/freq.db> <word>\n";
@@ -61,6 +63,17 @@ void cmd_deinflect(const std::string& inflected) {
       }
       std::cout << "\n";
     }
+  }
+}
+
+void cmd_preprocess(const std::string& text) {
+  auto results = text_processor::preprocess(text);
+
+  std::cout << "preproccesing for: " << text << " length: " << utf8::length(text) << "\n";
+  std::cout << "found " << results.size() << " variants\n";
+
+  for (const auto& r : results) {
+    std::cout << r.text << "\n";
   }
 }
 
@@ -173,6 +186,8 @@ int main(int argc, char* argv[]) {
     cmd_import(argv[2]);
   } else if (command == "deinflect" && argc >= 3) {
     cmd_deinflect(argv[2]);
+  } else if (command == "preprocess" && argc >= 3) {
+    cmd_preprocess(argv[2]);
   } else if (command == "query" && argc >= 4) {
     cmd_query(argv[2], argv[3]);
   } else if (command == "lookup" && argc >= 4) {

@@ -16,6 +16,7 @@ target_compile_definitions(zip PRIVATE MINIZ_DISABLE_ZIP_READER_CRC32_CHECKS)
 add_library(yomitandicts
     src/importer.cpp
     src/json/json_parser.cpp
+    src/preprocessor/text_processor.cpp
     src/deinflector.cpp
     src/query.cpp
     src/lookup.cpp
@@ -23,6 +24,7 @@ add_library(yomitandicts
 
 target_include_directories(yomitandicts PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/utfcpp/source
 )
 
 target_link_libraries(yomitandicts PRIVATE
