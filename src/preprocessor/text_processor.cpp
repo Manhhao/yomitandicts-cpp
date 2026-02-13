@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <utility>
 
-#include "utf8/cpp11.h"
+#include <utf8.h>
 
 namespace {
 struct TextProcessor {
