@@ -7,6 +7,7 @@ A part of this source code is also available under the MIT License.
 
 Files subject to GPLv3:
 - src/deinflector.cpp
+- src/preprocessor/text_processor.cpp
 - include/yomitandicts/deinflector.hpp
 
 If you wish to use parts of the project under the MIT License, you must:

@@ -4,6 +4,7 @@
 #include <map>
 #include <sstream>
 
+#include "preprocessor/text_processor.hpp"
 #include "utf8.hpp"
 
 namespace {
@@ -53,29 +54,33 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
   size_t text_len = utf8::length(lookup_string);
   for (size_t i = std::min(scan_length, text_len); i > 0; i--) {
     std::string search_str = lookup_string.substr(0, utf8::byte_position(lookup_string, i));
+    auto preprocessor_results = text_processor::preprocess(search_str);
+    for (auto& variant : preprocessor_results) {
+      auto deinflection_results = deinflector_.deinflect(variant.text);
+      for (auto& deinflection : deinflection_results) {
+        auto terms = query_.query(deinflection.text);
 
-    auto deinflection_results = deinflector_.deinflect(search_str);
-    for (auto& deinflection : deinflection_results) {
-      auto terms = query_.query(deinflection.text);
-
-      std::vector<TermResult> term_results = filter_by_pos(terms, deinflection);
-      for (const auto& term : term_results) {
-        // deduplicate glossaries
-        auto key = std::make_pair(term.expression, term.reading);
-        auto it = result_map.find(key);
-        if (it != result_map.end()) {
-          // we only need the longest matched form
-          if (utf8::length(search_str) > utf8::length(it->second.matched)) {
-            it->second = LookupResult{.matched = search_str,
-                                      .deinflected = deinflection.text,
-                                      .trace = deinflection.trace,
-                                      .term = term};
+        std::vector<TermResult> term_results = filter_by_pos(terms, deinflection);
+        for (const auto& term : term_results) {
+          // deduplicate glossaries
+          auto key = std::make_pair(term.expression, term.reading);
+          auto it = result_map.find(key);
+          if (it != result_map.end()) {
+            // we only need the longest matched form
+            if (utf8::length(search_str) > utf8::length(it->second.matched)) {
+              it->second = LookupResult{.matched = search_str,
+                                        .deinflected = deinflection.text,
+                                        .trace = deinflection.trace,
+                                        .term = term,
+                                        .preprocessor_steps = variant.steps};
+            }
+          } else {
+            result_map.emplace(key, LookupResult{.matched = search_str,
+                                                 .deinflected = deinflection.text,
+                                                 .trace = deinflection.trace,
+                                                 .term = term,
+                                                 .preprocessor_steps = variant.steps});
           }
-        } else {
-          result_map.emplace(key, LookupResult{.matched = search_str,
-                                               .deinflected = deinflection.text,
-                                               .trace = deinflection.trace,
-                                               .term = term});
         }
       }
     }
@@ -94,6 +99,12 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
     auto len_b = utf8::length(b.matched);
     if (len_a != len_b) {
       return len_a > len_b;
+    }
+
+    auto steps_a = a.preprocessor_steps;
+    auto steps_b = b.preprocessor_steps;
+    if (steps_a != steps_b) {
+      return steps_a < steps_b;
     }
 
     auto trace_len_a = a.trace.size();

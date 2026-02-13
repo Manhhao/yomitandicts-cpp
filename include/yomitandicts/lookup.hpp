@@ -11,6 +11,7 @@ struct LookupResult {
   std::string deinflected;
   std::vector<TransformGroup> trace;
   TermResult term;
+  int preprocessor_steps;
 };
 
 class Lookup {
