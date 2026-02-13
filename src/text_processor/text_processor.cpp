@@ -131,7 +131,7 @@ std::vector<TextProcessor> get_japanese_processors() {
 }
 
 // https://github.com/yomidevs/yomitan/blob/81d17d877fb18c62ba826210bf6db2b7f4d4deed/ext/js/language/translator.js#L564
-std::vector<TextVariant> text_processor::preprocess(const std::string& src) {
+std::vector<TextVariant> text_processor::process(const std::string& src) {
   std::u32string text = utf8::utf8to32(src);
   std::map<std::u32string, int> variants = {{text, 0}};
 

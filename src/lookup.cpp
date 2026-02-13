@@ -4,7 +4,7 @@
 #include <map>
 #include <sstream>
 
-#include "preprocessor/text_processor.hpp"
+#include "text_processor/text_processor.hpp"
 #include "utf8.hpp"
 
 namespace {
@@ -54,8 +54,8 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
   size_t text_len = utf8::length(lookup_string);
   for (size_t i = std::min(scan_length, text_len); i > 0; i--) {
     std::string search_str = lookup_string.substr(0, utf8::byte_position(lookup_string, i));
-    auto preprocessor_results = text_processor::preprocess(search_str);
-    for (auto& variant : preprocessor_results) {
+    auto processor_results = text_processor::process(search_str);
+    for (auto& variant : processor_results) {
       auto deinflection_results = deinflector_.deinflect(variant.text);
       for (auto& deinflection : deinflection_results) {
         auto terms = query_.query(deinflection.text);

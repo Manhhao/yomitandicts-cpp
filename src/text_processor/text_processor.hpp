@@ -9,5 +9,5 @@ struct TextVariant {
 };
 
 namespace text_processor {
-std::vector<TextVariant> preprocess(const std::string& src);
+std::vector<TextVariant> process(const std::string& src);
 }

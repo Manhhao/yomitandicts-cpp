@@ -6,7 +6,7 @@
 #include <string>
 
 #include "../src/json/json_parser.hpp"
-#include "../src/preprocessor/text_processor.hpp"
+#include "../src/text_processor/text_processor.hpp"
 #include "../src/utf8.hpp"
 #include "yomitandicts/deinflector.hpp"
 #include "yomitandicts/importer.hpp"
@@ -67,7 +67,7 @@ void cmd_deinflect(const std::string& inflected) {
 }
 
 void cmd_preprocess(const std::string& text) {
-  auto results = text_processor::preprocess(text);
+  auto results = text_processor::process(text);
 
   std::cout << "preproccesing for: " << text << " length: " << utf8::length(text) << "\n";
   std::cout << "found " << results.size() << " variants\n";
