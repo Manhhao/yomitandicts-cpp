@@ -113,6 +113,7 @@ std::u32string katakana_to_hiragana(const std::u32string& text) {
   return result;
 }
 
+// TODO: implement rest of preprocessors
 std::vector<TextProcessor> get_japanese_processors() {
   return {
       // https://github.com/yomidevs/yomitan/blob/81d17d877fb18c62ba826210bf6db2b7f4d4deed/ext/js/language/ja/japanese-text-preprocessors.js#L66
