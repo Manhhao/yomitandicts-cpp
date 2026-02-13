@@ -8,7 +8,7 @@ This library implements a dictionary backend that works similarly to [Yomitan](h
 ```cpp
 ImportResult dictionary_importer::import(const std::string& zip_path, const std::string& output_dir);
 ```
-Imports a Yomitan `.zip` dictionary file into a SQLite database. The resulting database is stored in `output_dir/<dict_title>.db`. Glossaries are compressed using zstd. Term, frequency and pitch dictionaries were tested, though this only supports .
+Imports a Yomitan `.zip` dictionary file into a SQLite database. The resulting database is stored in `output_dir/<dict_title>.db`. Glossaries are compressed using zstd. Term, frequency and pitch dictionaries were tested, though this only supports a small part of the pitch accent spec.
 
 ### query
 ```cpp
