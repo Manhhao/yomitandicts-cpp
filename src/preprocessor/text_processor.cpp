@@ -13,6 +13,7 @@ struct TextProcessor {
   std::function<std::u32string(const std::u32string&, int)> process;
 };
 
+// https://github.com/yomidevs/yomitan/blob/81d17d877fb18c62ba826210bf6db2b7f4d4deed/ext/js/language/ja/japanese.js#L21
 constexpr uint32_t KATAKANA_SMALL_KA = 0x30f5;
 constexpr uint32_t KATAKANA_SMALL_KE = 0x30f6;
 constexpr uint32_t KANA_PROLONGED_SOUND_MARK = 0x30fc;
@@ -23,6 +24,7 @@ constexpr uint32_t HIRAGANA_CONVERSION_RANGE_END = 0x3096;
 constexpr uint32_t KATAKANA_CONVERSION_RANGE_START = 0x30a1;
 constexpr uint32_t KATAKANA_CONVERSION_RANGE_END = 0x30f6;
 
+// https://github.com/yomidevs/yomitan/blob/81d17d877fb18c62ba826210bf6db2b7f4d4deed/ext/js/language/ja/japanese.js#L121
 const std::unordered_map<char32_t, std::u32string> VOWEL_TO_KANA{
     {U'a', U"ぁあかがさざただなはばぱまゃやらゎわヵァアカガサザタダナハバパマャヤラヮワヵヷ"},
     {U'i', U"ぃいきぎしじちぢにひびぴみりゐィイキギシジチヂニヒビピミリヰヸ"},
@@ -30,6 +32,7 @@ const std::unordered_map<char32_t, std::u32string> VOWEL_TO_KANA{
     {U'e', U"ぇえけげせぜてでねへべぺめれゑヶェエケゲセゼテデネヘベペメレヱヶヹ"},
     {U'o', U"ぉおこごそぞとどのほぼぽもょよろをォオコゴソゾトドノホボポモョヨロヲヺ"}};
 
+// https://github.com/yomidevs/yomitan/blob/81d17d877fb18c62ba826210bf6db2b7f4d4deed/ext/js/language/ja/japanese.js#L131
 std::unordered_map<char32_t, char32_t> build_kana_to_vowel_map() {
   std::unordered_map<char32_t, char32_t> map;
   for (const auto& [vowel, kana_string] : VOWEL_TO_KANA) {
@@ -49,6 +52,7 @@ char32_t kana_to_vowel(char32_t kana) {
   return 0;
 }
 
+// https://github.com/yomidevs/yomitan/blob/81d17d877fb18c62ba826210bf6db2b7f4d4deed/ext/js/language/ja/japanese.js#L155
 char32_t get_prolonged_hiragana(char32_t prev) {
   switch (kana_to_vowel(prev)) {
     case U'a':
@@ -68,6 +72,7 @@ char32_t get_prolonged_hiragana(char32_t prev) {
 
 bool is_in_range(uint32_t c, uint32_t range_start, uint32_t range_end) { return c >= range_start && c <= range_end; }
 
+// https://github.com/yomidevs/yomitan/blob/81d17d877fb18c62ba826210bf6db2b7f4d4deed/ext/js/language/ja/japanese.js#L472
 std::u32string hiragana_to_katakana(const std::u32string& text) {
   std::u32string result;
   const uint32_t offset = (KATAKANA_CONVERSION_RANGE_START - HIRAGANA_CONVERSION_RANGE_START);
@@ -80,6 +85,7 @@ std::u32string hiragana_to_katakana(const std::u32string& text) {
   return result;
 }
 
+// https://github.com/yomidevs/yomitan/blob/81d17d877fb18c62ba826210bf6db2b7f4d4deed/ext/js/language/ja/japanese.js#L441
 std::u32string katakana_to_hiragana(const std::u32string& text) {
   std::u32string result;
   const uint32_t offset = (HIRAGANA_CONVERSION_RANGE_START - KATAKANA_CONVERSION_RANGE_START);
@@ -108,19 +114,22 @@ std::u32string katakana_to_hiragana(const std::u32string& text) {
 }
 
 std::vector<TextProcessor> get_japanese_processors() {
-  return {{.options = {0, 1, 2}, .process = [](const std::u32string& text, int opt) -> std::u32string {
-             switch (opt) {
-               case 1:
-                 return katakana_to_hiragana(text);
-               case 2:
-                 return hiragana_to_katakana(text);
-               default:
-                 return text;
-             }
-           }}};
+  return {
+      // https://github.com/yomidevs/yomitan/blob/81d17d877fb18c62ba826210bf6db2b7f4d4deed/ext/js/language/ja/japanese-text-preprocessors.js#L66
+      {.options = {0, 1, 2}, .process = [](const std::u32string& text, int opt) -> std::u32string {
+         switch (opt) {
+           case 1:
+             return katakana_to_hiragana(text);
+           case 2:
+             return hiragana_to_katakana(text);
+           default:
+             return text;
+         }
+       }}};
 }
 }
 
+// https://github.com/yomidevs/yomitan/blob/81d17d877fb18c62ba826210bf6db2b7f4d4deed/ext/js/language/translator.js#L564
 std::vector<TextVariant> text_processor::preprocess(const std::string& src) {
   std::u32string text = utf8::utf8to32(src);
   std::map<std::u32string, int> variants = {{text, 0}};
