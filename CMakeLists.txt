@@ -40,3 +40,11 @@ add_executable(yomitandicts-cpp
 target_link_libraries(yomitandicts-cpp PRIVATE
     yomitandicts
 )
+
+add_executable(test-processors
+    cli/test_processors.cpp
+)
+
+target_link_libraries(test-processors PRIVATE
+    yomitandicts
+)
