@@ -69,11 +69,15 @@ void cmd_deinflect(const std::string& inflected) {
 void cmd_preprocess(const std::string& text) {
   auto results = text_processor::process(text);
 
+  std::sort(results.begin(), results.end(), [](const TextVariant& a, const TextVariant& b) {
+    return a.steps < b.steps;
+  });
+
   std::cout << "preproccesing for: " << text << " length: " << utf8::length(text) << "\n";
   std::cout << "found " << results.size() << " variants\n";
 
   for (const auto& r : results) {
-    std::cout << r.text << "\n";
+    std::cout << r.text << " (steps=" << r.steps << ")\n";
   }
 }
 

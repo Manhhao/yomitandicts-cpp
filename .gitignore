@@ -44,9 +44,13 @@
 build/
 .build/
 .cache/
+tmp/
 
 # macos ds_store
 .DS_Store
 
 # Swift 
 Package.resolved
+
+# jetbrains
+.idea
