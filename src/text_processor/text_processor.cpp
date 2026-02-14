@@ -1,5 +1,6 @@
 #include "text_processor.hpp"
 
+#include <functional>
 #include <map>
 #include <string>
 #include <unordered_map>
