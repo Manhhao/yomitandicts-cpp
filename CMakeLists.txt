@@ -16,7 +16,7 @@ target_compile_definitions(zip PRIVATE MINIZ_DISABLE_ZIP_READER_CRC32_CHECKS)
 add_library(yomitandicts
     src/importer.cpp
     src/json/json_parser.cpp
-    src/preprocessor/text_processor.cpp
+    src/text_processor/text_processor.cpp
     src/deinflector.cpp
     src/query.cpp
     src/lookup.cpp
