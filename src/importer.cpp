@@ -4,9 +4,12 @@
 #include <zip.h>
 #include <zstd.h>
 
+#include <cstddef>
 #include <filesystem>
+#include <future>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include "json/yomitan_parser.hpp"
@@ -131,7 +134,8 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<int>& files, Imp
 
   sqlite3_stmt* stmt;
   sqlite3_prepare_v2(db, "INSERT INTO terms VALUES (?, ?, ?, ?, ?, ?, ?, ?)", -1, &stmt, nullptr);
-
+  
+  const size_t num_threads = std::max(1U, std::thread::hardware_concurrency() - 1);
   for (int index : files) {
     std::string content = read_file_by_index(archive, index);
     if (content.empty()) {
@@ -142,8 +146,25 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<int>& files, Imp
     if (!yomitan_parser::parse_term_bank(content, out)) {
       continue;
     }
-  
-    for (const auto& term : out) {
+
+    std::vector<std::vector<char>> glossaries(out.size());
+    std::vector<std::future<void>> futures;
+    size_t chunk_size = out.size() / num_threads;
+    for (size_t i = 0; i < num_threads; i++) {
+      size_t start = i * chunk_size;
+      size_t end = (i == num_threads - 1) ? out.size() : std::min(out.size(), start + chunk_size);
+      if (start >= out.size()) {
+        break;
+      }
+      futures.push_back(std::async(std::launch::async, [&glossaries, &out, start, end] {
+        for (size_t t = start; t < end; t++) {
+          glossaries[t] = compress_glossary(out[t].glossary.str.data(), out[t].glossary.str.size());
+        }
+      }));
+    }
+
+    for (size_t i = 0; i < out.size(); ++i) {
+      const auto& term = out[i];
       sqlite3_bind_text(stmt, 1, term.expression.data(), static_cast<int>(term.expression.size()), SQLITE_STATIC);
       sqlite3_bind_text(stmt, 2, term.reading.data(), static_cast<int>(term.reading.size()), SQLITE_STATIC);
       sqlite3_bind_text(stmt, 3, term.definition_tags.data(), static_cast<int>(term.definition_tags.size()),
@@ -151,8 +172,7 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<int>& files, Imp
       sqlite3_bind_text(stmt, 4, term.rules.data(), static_cast<int>(term.rules.size()), SQLITE_STATIC);
       sqlite3_bind_int(stmt, 5, term.score);
 
-      std::vector<char> compressed = compress_glossary(term.glossary.str.data(), term.glossary.str.size());
-      sqlite3_bind_blob(stmt, 6, compressed.data(), static_cast<int>(compressed.size()), SQLITE_TRANSIENT);
+      sqlite3_bind_blob(stmt, 6, glossaries[i].data(), static_cast<int>(glossaries[i].size()), SQLITE_TRANSIENT);
 
       sqlite3_bind_int(stmt, 7, term.sequence);
       sqlite3_bind_text(stmt, 8, term.term_tags.data(), static_cast<int>(term.term_tags.size()), SQLITE_STATIC);
@@ -183,7 +203,7 @@ void store_meta(sqlite3* db, zip_t* archive, const std::vector<int>& files, Impo
     if (!yomitan_parser::parse_meta_bank(content, out)) {
       continue;
     }
-    
+
     for (const auto& meta : out) {
       sqlite3_bind_text(stmt, 1, meta.expression.data(), static_cast<int>(meta.expression.size()), SQLITE_STATIC);
       sqlite3_bind_text(stmt, 2, meta.mode.data(), static_cast<int>(meta.mode.size()), SQLITE_STATIC);
