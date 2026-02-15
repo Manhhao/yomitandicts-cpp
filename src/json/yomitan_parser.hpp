@@ -1,0 +1,47 @@
+#pragma once
+#include <string_view>
+#include <vector>
+
+struct Index {
+  std::string_view title;
+  int format = 3;
+  std::string_view revision;
+  bool updatable;
+  std::string_view index_url;
+  std::string_view download_url;
+};
+
+struct Term {
+  std::string_view expression;
+  std::string_view reading;
+  std::string_view definition_tags;
+  std::string_view rules;
+  int score = 0;
+  std::string_view glossary;
+  int sequence = 0;
+  std::string_view term_tags;
+};
+
+struct Meta {
+  std::string_view expression;
+  std::string_view mode;
+  std::string_view data;
+};
+
+struct Tag {
+  std::string_view name;
+  std::string_view category;
+  int order = 0;
+  std::string_view notes;
+  int score = 0;
+};
+
+
+namespace yomitan_parser {
+  bool parse_index(std::string_view content, Index& out);
+  bool parse_term_bank(std::string_view content, std::vector<Term>& out);
+  bool parse_meta_bank(std::string_view content, std::vector<Meta>& out);
+  bool parse_tag_bank(std::string_view content, std::vector<Tag>& out);
+  // bool parse_frequency(std::string_view content, ParsedFrequency& out);
+  // bool parse_pitch(std::string_view content, ParsedPitch& out);
+};

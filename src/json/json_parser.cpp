@@ -15,115 +15,6 @@ YomitanJSONParser::YomitanJSONParser(std::string_view content) : src_(content), 
   }
 }
 
-bool YomitanJSONParser::parse_index(Index& out) {
-  if (!expect('{')) {
-    return false;
-  }
-  pos_++;
-
-  while (pos_ < src_.size() && src_[pos_] != '}') {
-    std::string_view key = parse_string();
-    if (!expect(':')) {
-      return false;
-    }
-    pos_++;
-
-    if (key == "title") {
-      out.title = parse_string();
-    } else if (key == "revision") {
-      out.revision = parse_string();
-    } else if (key == "format") {
-      out.version = parse_number();
-    } else {
-      skip();
-    }
-
-    consume_comma();
-  }
-  return true;
-}
-
-bool YomitanJSONParser::parse_term(Term& out) {
-  if (!enter_next_entry()) {
-    return false;
-  }
-
-  out.expression = parse_string();
-  consume_comma();
-
-  out.reading = parse_string();
-  if (out.reading.empty()) {
-    out.reading = out.expression;
-  }
-  consume_comma();
-
-  if (expect('"')) {
-    out.definition_tags = parse_string();
-  }
-  else {
-    skip();
-    out.definition_tags = "";
-  }
-  consume_comma();
-
-  out.rules = parse_string();
-  consume_comma();
-
-  out.score = parse_number();
-  consume_comma();
-
-  out.glossary = extract_single_value();
-  consume_comma();
-
-  out.sequence = parse_number();
-  consume_comma();
-
-  out.term_tags = parse_string();
-
-  consume_array_end();
-  return true;
-}
-
-bool YomitanJSONParser::parse_meta(Meta& out) {
-  if (!enter_next_entry()) {
-    return false;
-  }
-
-  out.expression = parse_string();
-  consume_comma();
-
-  out.mode = parse_string();
-  consume_comma();
-
-  out.data = extract_single_value();
-
-  consume_array_end();
-  return true;
-}
-
-bool YomitanJSONParser::parse_tag(Tag& out) {
-  if (!enter_next_entry()) {
-    return false;
-  }
-
-  out.name = parse_string();
-  consume_comma();
-
-  out.category = parse_string();
-  consume_comma();
-
-  out.order = parse_number();
-  consume_comma();
-
-  out.notes = parse_string();
-  consume_comma();
-
-  out.score = parse_number();
-
-  consume_array_end();
-  return true;
-}
-
 bool YomitanJSONParser::parse_frequency(ParsedFrequency& out) {
   if (pos_ < src_.size() && is_digit(src_[pos_])) {
     out.value = parse_number();
@@ -243,7 +134,8 @@ bool YomitanJSONParser::parse_pitch_position(int& position) {
     }
     pos_++;
 
-    // there are a a few more keys, in the three most popular dicts (NHK 2016, 大辞泉, アクセント辞典v2) these seem to be empty, will handle eventually
+    // there are a a few more keys, in the three most popular dicts (NHK 2016, 大辞泉, アクセント辞典v2) these seem to
+    // be empty, will handle eventually
     if (key == "position") {
       // according to spec this can be a string as well, haven't found a dict using this yet
       position = parse_number();

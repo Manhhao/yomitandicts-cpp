@@ -9,7 +9,7 @@
 #include <string_view>
 #include <vector>
 
-#include "json/json_parser.hpp"
+#include "json/yomitan_parser.hpp"
 
 namespace {
 std::string read_file_by_index(zip_t* archive, int index) {
@@ -114,7 +114,7 @@ void store_index(sqlite3* db, const Index& index, const std::string& styles) {
   sqlite3_prepare_v2(db, "INSERT INTO info VALUES (?, ?, ?, ?)", -1, &stmt, nullptr);
   sqlite3_bind_text(stmt, 1, index.title.data(), static_cast<int>(index.title.size()), SQLITE_STATIC);
   sqlite3_bind_text(stmt, 2, index.revision.data(), static_cast<int>(index.revision.size()), SQLITE_STATIC);
-  sqlite3_bind_int(stmt, 3, index.version);
+  sqlite3_bind_int(stmt, 3, index.format);
   if (!styles.empty()) {
     sqlite3_bind_text(stmt, 4, styles.c_str(), -1, SQLITE_STATIC);
   } else {
@@ -132,15 +132,18 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<int>& files, Imp
   sqlite3_stmt* stmt;
   sqlite3_prepare_v2(db, "INSERT INTO terms VALUES (?, ?, ?, ?, ?, ?, ?, ?)", -1, &stmt, nullptr);
 
-  Term term;
   for (int index : files) {
     std::string content = read_file_by_index(archive, index);
     if (content.empty()) {
       continue;
     }
 
-    YomitanJSONParser parser(content);
-    while (parser.parse_term(term)) {
+    std::vector<Term> out;
+    if (!yomitan_parser::parse_term_bank(content, out)) {
+      continue;
+    }
+  
+    for (const auto& term : out) {
       sqlite3_bind_text(stmt, 1, term.expression.data(), static_cast<int>(term.expression.size()), SQLITE_STATIC);
       sqlite3_bind_text(stmt, 2, term.reading.data(), static_cast<int>(term.reading.size()), SQLITE_STATIC);
       sqlite3_bind_text(stmt, 3, term.definition_tags.data(), static_cast<int>(term.definition_tags.size()),
@@ -169,15 +172,19 @@ void store_meta(sqlite3* db, zip_t* archive, const std::vector<int>& files, Impo
 
   sqlite3_stmt* stmt;
   sqlite3_prepare_v2(db, "INSERT INTO term_meta VALUES (?, ?, ?)", -1, &stmt, nullptr);
-  Meta meta;
+
   for (int index : files) {
     std::string content = read_file_by_index(archive, index);
     if (content.empty()) {
       continue;
     }
 
-    YomitanJSONParser parser(content);
-    while (parser.parse_meta(meta)) {
+    std::vector<Meta> out;
+    if (!yomitan_parser::parse_meta_bank(content, out)) {
+      continue;
+    }
+    
+    for (const auto& meta : out) {
       sqlite3_bind_text(stmt, 1, meta.expression.data(), static_cast<int>(meta.expression.size()), SQLITE_STATIC);
       sqlite3_bind_text(stmt, 2, meta.mode.data(), static_cast<int>(meta.mode.size()), SQLITE_STATIC);
       sqlite3_bind_text(stmt, 3, meta.data.data(), static_cast<int>(meta.data.size()), SQLITE_STATIC);
@@ -197,15 +204,19 @@ void store_tags(sqlite3* db, zip_t* archive, const std::vector<int>& files, Impo
 
   sqlite3_stmt* stmt;
   sqlite3_prepare_v2(db, "INSERT INTO tags VALUES (?, ?, ?, ?, ?)", -1, &stmt, nullptr);
-  Tag tag;
+
   for (int index : files) {
     std::string content = read_file_by_index(archive, index);
     if (content.empty()) {
       continue;
     }
 
-    YomitanJSONParser parser(content);
-    while (parser.parse_tag(tag)) {
+    std::vector<Tag> out;
+    if (!yomitan_parser::parse_tag_bank(content, out)) {
+      continue;
+    }
+
+    for (const auto& tag : out) {
       sqlite3_bind_text(stmt, 1, tag.name.data(), static_cast<int>(tag.name.size()), SQLITE_STATIC);
       sqlite3_bind_text(stmt, 2, tag.category.data(), static_cast<int>(tag.category.size()), SQLITE_STATIC);
       sqlite3_bind_int(stmt, 3, tag.order);
@@ -237,8 +248,7 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
     }
 
     Index index;
-    YomitanJSONParser parser(index_content);
-    if (!parser.parse_index(index)) {
+    if (!yomitan_parser::parse_index(index_content, index)) {
       throw std::runtime_error("failed to parse index.json");
     }
 
