@@ -4,3 +4,6 @@
 [submodule "external/utfcpp"]
 	path = external/utfcpp
 	url = https://github.com/nemtrif/utfcpp.git
+[submodule "external/glaze"]
+	path = external/glaze
+	url = https://github.com/stephenberry/glaze

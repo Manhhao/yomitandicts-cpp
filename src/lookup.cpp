@@ -1,12 +1,13 @@
 #include "yomitandicts/lookup.hpp"
 
+#include <utf8.h>
+
 #include <algorithm>
 #include <map>
 #include <ranges>
 #include <sstream>
 
 #include "text_processor/text_processor.hpp"
-#include <utf8.h>
 
 namespace {
 std::vector<std::string> split_whitespace(const std::string& str) {
@@ -73,7 +74,8 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
           auto it = result_map.find(key);
           if (it != result_map.end()) {
             // we only need the longest matched form
-            if (utf8::distance(search_str.begin(), search_str.end()) > utf8::distance(it->second.matched.begin(), it->second.matched.end())) {
+            if (utf8::distance(search_str.begin(), search_str.end()) >
+                utf8::distance(it->second.matched.begin(), it->second.matched.end())) {
               it->second = LookupResult{.matched = search_str,
                                         .deinflected = deinflection.text,
                                         .trace = deinflection.trace,

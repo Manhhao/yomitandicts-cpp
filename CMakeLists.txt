@@ -10,6 +10,7 @@ find_package(SQLite3 REQUIRED)
 find_package(zstd REQUIRED)
 
 add_subdirectory(external/zip)
+add_subdirectory(external/glaze)
 
 target_compile_definitions(zip PRIVATE MINIZ_DISABLE_ZIP_READER_CRC32_CHECKS)
 
@@ -29,6 +30,7 @@ target_include_directories(yomitandicts PUBLIC
 
 target_link_libraries(yomitandicts PRIVATE
     zip
+    glaze::glaze
     SQLite::SQLite3
     zstd::libzstd_static
 )
