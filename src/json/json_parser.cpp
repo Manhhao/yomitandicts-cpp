@@ -260,7 +260,7 @@ bool YomitanJSONParser::parse_pitch_position(int& position) {
 }
 
 void YomitanJSONParser::consume_bom() {
-  if (src_.substr(0, 3) == "\xEF\xBB\xBF") {
+  if (src_.starts_with("\xEF\xBB\xBF")) {
     pos_ = 3;
   }
 }
