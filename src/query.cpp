@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <map>
+#include <ranges>
 
 #include "json/json_parser.hpp"
 
@@ -174,12 +175,7 @@ std::vector<TermResult> DictionaryQuery::query(const std::string& expression) co
     sqlite3_reset(stmt);
   }
 
-  std::vector<TermResult> results{};
-  results.reserve(term_map.size());
-  for (auto& [key, term] : term_map) {
-    results.push_back(std::move(term));
-  }
-
+  auto results = term_map | std::views::values | std::views::as_rvalue | std::ranges::to<std::vector>();
   query_freq(results);
   query_pitch(results);
 
@@ -235,7 +231,7 @@ void DictionaryQuery::query_pitch(std::vector<TermResult>& terms) const {
       sqlite3_reset(stmt);
 
       if (!pitch_positions.empty()) {
-        term.pitches.emplace_back(PitchEntry {.dict_name = name, .pitch_positions = std::move(pitch_positions)});
+        term.pitches.emplace_back(PitchEntry{.dict_name = name, .pitch_positions = std::move(pitch_positions)});
       }
     }
   }
@@ -264,21 +260,11 @@ std::string DictionaryQuery::decompress_glossary(const void* data, size_t size) 
 }
 
 std::vector<DictionaryStyle> DictionaryQuery::get_styles() const {
-  std::vector<DictionaryStyle> styles;
-  styles.reserve(dicts_.size());
-  for (const auto& d : dicts_) {
-    if (!d.styles.empty()) {
-      styles.emplace_back(d.name, d.styles);
-    }
-  }
-  return styles;
+  return dicts_ | std::views::filter([](const auto& d) { return !d.styles.empty(); }) |
+         std::views::transform([](const auto& d) { return DictionaryStyle{d.name, d.styles}; }) |
+         std::ranges::to<std::vector>();
 }
 
 std::vector<std::string> DictionaryQuery::get_freq_dict_order() const {
-  std::vector<std::string> names;
-  names.reserve(freq_dicts_.size());
-  for (const auto& d : freq_dicts_) {
-    names.push_back(d.name);
-  }
-  return names;
+  return freq_dicts_ | std::views::transform([](const auto& d) { return d.name; }) | std::ranges::to<std::vector>();
 }

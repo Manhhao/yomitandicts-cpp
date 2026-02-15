@@ -2,7 +2,8 @@
 
 #include <chrono>
 #include <filesystem>
-#include <iostream>
+#include <print>
+#include <ranges>
 #include <string>
 
 #include "../src/json/json_parser.hpp"
@@ -14,13 +15,13 @@
 #include "yomitandicts/query.hpp"
 
 void print_usage(const char* program) {
-  std::cout << "Usage:\n";
-  std::cout << program << " import <path/to/dictionary.zip>\n";
-  std::cout << program << " deinflect <word>\n";
-  std::cout << program << " preprocess <word>\n";
-  std::cout << program << " query <path/to/database.db> <word>\n";
-  std::cout << program << " lookup <path/to/database.db> <lookup_string>\n";
-  std::cout << program << " freq <path/to/freq.db> <word>\n";
+  std::println("Usage:");
+  std::println("{} import <path/to/dictionary.zip>", program);
+  std::println("{} deinflect <word>", program);
+  std::println("{} preprocess <word>", program);
+  std::println("{} query <path/to/database.db> <word>", program);
+  std::println("{} lookup <path/to/database.db> <lookup_string>", program);
+  std::println("{} freq <path/to/freq.db> <word>", program);
 }
 
 void cmd_import(const std::string& path) {
@@ -32,14 +33,14 @@ void cmd_import(const std::string& path) {
   ImportResult result = dictionary_importer::import(path, output_dir);
 
   if (result.success) {
-    std::cout << "title: " << result.title << "\n";
-    std::cout << "term_count: " << result.term_count << "\n";
-    std::cout << "meta_count: " << result.meta_count << "\n";
-    std::cout << "tag_count: " << result.tag_count << "\n";
+    std::println("title: {}", result.title);
+    std::println("term_count: {}", result.term_count);
+    std::println("meta_count: {}", result.meta_count);
+    std::println("tag_count: {}", result.tag_count);
   } else {
-    std::cerr << "could not import dictionary:\n";
+    std::println(stderr, "could not import dictionary:");
     for (const auto& error : result.errors) {
-      std::cerr << "  " << error << "\n";
+      std::println(stderr, " {}", error);
     }
   }
 }
@@ -48,20 +49,17 @@ void cmd_deinflect(const std::string& inflected) {
   Deinflector deinflector;
   auto results = deinflector.deinflect(inflected);
 
-  std::cout << "deinflections for: " << inflected << " length: " << utf8::length(inflected) << "\n";
-  std::cout << "found " << results.size() << " candidates\n\n";
+  std::println("deinflections for: {} length: {}", inflected, utf8::length(inflected));
+  std::println("found {} candidates\n", results.size());
 
   for (const auto& r : results) {
-    std::cout << r.text << " (conditions: " << r.conditions << ")\n";
+    std::println("{} (conditions: {})", r.text, r.conditions);
     if (!r.trace.empty()) {
-      std::cout << "  ";
-      for (size_t i = 0; i < r.trace.size(); i++) {
-        std::cout << r.trace[i].name;
-        if (i < r.trace.size() - 1) {
-          std::cout << " -> ";
-        }
+      std::print("  ");
+      for (size_t i = 0; i < r.trace.size(); ++i) {
+        std::print("{}{}", r.trace[i].name, i < r.trace.size() - 1 ? " -> " : "");
       }
-      std::cout << "\n";
+      std::println("");
     }
   }
 }
@@ -69,11 +67,11 @@ void cmd_deinflect(const std::string& inflected) {
 void cmd_preprocess(const std::string& text) {
   auto results = text_processor::process(text);
 
-  std::cout << "preproccesing for: " << text << " length: " << utf8::length(text) << "\n";
-  std::cout << "found " << results.size() << " variants\n";
+  std::println("preproccesing for: {} length: {}", text, utf8::length(text));
+  std::println("found {} variants", results.size());
 
   for (const auto& r : results) {
-    std::cout << r.text << "\n";
+    std::println("{}", r.text);
   }
 }
 
@@ -82,16 +80,16 @@ void cmd_query(const std::string& db_path, const std::string& expression) {
   dict_query.add_dict(db_path);
   auto result = dict_query.query(expression);
 
-  std::cout << "query results for: " << expression << " length: " << utf8::length(expression) << "\n";
-  std::cout << result.size() << " entries\n";
+  std::println("query results for: {} length: {}", expression, utf8::length(expression));
+  std::println("{} entries", result.size());
   for (const auto& r : result) {
-    std::cout << "---------------------------------------------------------------\n";
-    std::cout << r.expression << " " << r.reading << " " << r.definition_tags << "\n";
-    std::cout << r.glossaries.size() << " glossary entries\n";
+    std::println("---------------------------------------------------------------");
+    std::println("{} {} {}", r.expression, r.reading, r.definition_tags);
+    std::println("{} glossary entries", r.glossaries.size());
     for (const auto& g : r.glossaries) {
-      std::cout << "------\n";
-      std::cout << g.dict_name << "\n";
-      std::cout << g.glossary << "\n";
+      std::println("------");
+      std::println("{}", g.dict_name);
+      std::println("{}", g.glossary);
     }
   }
 }
@@ -99,34 +97,33 @@ void cmd_query(const std::string& db_path, const std::string& expression) {
 void cmd_freq(const std::string& freq_db, const std::string& expression) {
   sqlite3* db;
   if (sqlite3_open_v2(freq_db.c_str(), &db, SQLITE_OPEN_READONLY, nullptr) != SQLITE_OK) {
-    std::cout << "failed to open database\n";
+    std::println(stderr, "failed to open database");
     return;
   }
   sqlite3_stmt* stmt;
   if (sqlite3_prepare_v2(db, "SELECT expression, data FROM term_meta WHERE expression = ? AND mode = 'freq'", -1, &stmt,
                          nullptr) != SQLITE_OK) {
-    std::cout << "failed to prepare statement\n";
+    std::println(stderr, "failed to prepare statement");
     sqlite3_close(db);
     return;
   }
   sqlite3_bind_text(stmt, 1, expression.c_str(), -1, SQLITE_STATIC);
-  std::cout << "frequency entries for: " << expression << "\n";
+  std::println("frequency entries for: {}", expression);
   int count = 0;
   while (sqlite3_step(stmt) == SQLITE_ROW) {
     const char* expr = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
     const char* data = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
-    std::cout << "raw: " << data << "\n";
+    std::println("raw: {}", data);
     ParsedFrequency parsed;
     YomitanJSONParser parser(data);
     if (parser.parse_frequency(parsed)) {
-      std::cout << "parsed: reading=" << parsed.reading << " value=" << parsed.value
-                << " display=" << parsed.display_value << "\n";
+      std::println("parsed: reading={} value={} display={}", parsed.reading, parsed.value, parsed.display_value);
     } else {
-      std::cout << "failed to parse\n";
+      std::println(stderr, "failed to parse");
     }
     count++;
   }
-  std::cout << "entries: " << count << "\n";
+  std::println("entries: {}", count);
   sqlite3_finalize(stmt);
   sqlite3_close(db);
 }
@@ -141,35 +138,31 @@ void cmd_lookup(const std::vector<std::string>& db_paths, const std::string& loo
   Lookup lookup(dict_query, deinflect);
   auto result = lookup.lookup(lookup_string, max_results, scan_length);
 
-  std::cout << "lookup results for: " << lookup_string << " max_results: " << max_results
-            << " scan_length: " << scan_length << "\n";
-  std::cout << result.size() << " results\n";
+  std::println("lookup results for: {} max_results: {} scan_length: {}", lookup_string, max_results, scan_length);
+  std::println("{} results", result.size());
 
   for (const auto& r : result) {
-    std::cout << "---------------------------------------------------------------\n";
-    std::cout << r.matched << "\n";
+    std::println("---------------------------------------------------------------");
+    std::println("{}", r.matched);
     if (!r.trace.empty()) {
-      std::cout << "  ";
-      for (size_t i = 0; i < r.trace.size(); i++) {
-        std::cout << r.trace[i].name;
-        if (i < r.trace.size() - 1) {
-          std::cout << " -> ";
-        }
+      std::print("  ");
+      for (size_t i = 0; i < r.trace.size(); ++i) {
+        std::print("{}{}", r.trace[i].name, i < r.trace.size() - 1 ? " -> " : "");
       }
-      std::cout << "\n";
+      std::println("");
     }
-    std::cout << r.term.expression << " " << r.term.reading << "\n";
+    std::println("{} {}", r.term.expression, r.term.reading);
     for (const auto& g : r.term.glossaries) {
-      std::cout << "------\n";
-      std::cout << g.dict_name << "\n";
-      std::cout << g.glossary << "\n";
+      std::println("------");
+      std::println("{}", g.dict_name);
+      std::println("{}", g.glossary);
     }
   }
 
-  std::cout << "styles: \n";
+  std::println("styles: ");
   for (const auto& s : dict_query.get_styles()) {
-    std::cout << s.dict_name << "\n";
-    std::cout << s.styles << "\n";
+    std::println("{}", s.dict_name);
+    std::println("{}", s.styles);
   }
 }
 
@@ -191,23 +184,21 @@ int main(int argc, char* argv[]) {
   } else if (command == "query" && argc >= 4) {
     cmd_query(argv[2], argv[3]);
   } else if (command == "lookup" && argc >= 4) {
-    std::vector<std::string> db_paths;
+    auto db_paths = std::views::counted(argv + 2, argc - 3) |
+                    std::views::transform([](const char* arg) { return std::string(arg); }) |
+                    std::ranges::to<std::vector>();
     std::string term = argv[argc - 1];
-    for (int i = 2; i < argc - 1; ++i) {
-      db_paths.emplace_back(argv[i]);
-    }
     cmd_lookup(db_paths, term);
   } else if (command == "freq" && argc >= 4) {
     cmd_freq(argv[2], argv[3]);
   } else {
-    std::cerr << "Invalid command or insufficient arguments.\n";
     print_usage(argv[0]);
     return 1;
   }
 
   const auto end = std::chrono::steady_clock::now();
   std::chrono::duration<double, std::milli> duration = end - begin;
-  std::cout << "runtime: " << duration.count() << "ms\n";
+  std::println("runtime: {}ms", duration.count());
 
   return 0;
 }
