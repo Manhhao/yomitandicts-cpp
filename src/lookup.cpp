@@ -6,7 +6,7 @@
 #include <sstream>
 
 #include "text_processor/text_processor.hpp"
-#include "utf8.hpp"
+#include <utf8.h>
 
 namespace {
 std::vector<std::string> split_whitespace(const std::string& str) {
@@ -52,9 +52,14 @@ bool freq_sort_order(const LookupResult& a, const LookupResult& b, const std::ve
 
 std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int max_results, size_t scan_length) const {
   std::map<std::pair<std::string, std::string>, LookupResult> result_map;
-  size_t text_len = utf8::length(lookup_string);
+
+  size_t text_len = utf8::distance(lookup_string.begin(), lookup_string.end());
+  size_t start = std::min(scan_length, text_len);
+  auto search_str_it = lookup_string.begin();
+  utf8::advance(search_str_it, start, lookup_string.end());
+
   for (size_t i = std::min(scan_length, text_len); i > 0; i--) {
-    std::string search_str = lookup_string.substr(0, utf8::byte_position(lookup_string, i));
+    std::string search_str(lookup_string.begin(), search_str_it);
     auto processor_results = text_processor::process(search_str);
     for (auto& variant : processor_results) {
       auto deinflection_results = deinflector_.deinflect(variant.text);
@@ -68,7 +73,7 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
           auto it = result_map.find(key);
           if (it != result_map.end()) {
             // we only need the longest matched form
-            if (utf8::length(search_str) > utf8::length(it->second.matched)) {
+            if (utf8::distance(search_str.begin(), search_str.end()) > utf8::distance(it->second.matched.begin(), it->second.matched.end())) {
               it->second = LookupResult{.matched = search_str,
                                         .deinflected = deinflection.text,
                                         .trace = deinflection.trace,
@@ -85,14 +90,17 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
         }
       }
     }
+    if (i > 1) {
+      utf8::prior(search_str_it, lookup_string.begin());
+    }
   }
 
   auto results = result_map | std::views::values | std::views::as_rvalue | std::ranges::to<std::vector>();
   const auto freq_dict_order = query_.get_freq_dict_order();
   auto middle_iter = std::ranges::next(results.begin(), max_results, results.end());
   std::ranges::partial_sort(results, middle_iter, [&freq_dict_order](const auto& a, const auto& b) {
-    auto len_a = utf8::length(a.matched);
-    auto len_b = utf8::length(b.matched);
+    auto len_a = utf8::distance(a.matched.begin(), a.matched.end());
+    auto len_b = utf8::distance(b.matched.begin(), b.matched.end());
     if (len_a != len_b) {
       return len_a > len_b;
     }

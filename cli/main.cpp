@@ -1,4 +1,5 @@
 #include <sqlite3.h>
+#include <utf8.h>
 
 #include <chrono>
 #include <filesystem>
@@ -8,7 +9,6 @@
 
 #include "../src/json/json_parser.hpp"
 #include "../src/text_processor/text_processor.hpp"
-#include "../src/utf8.hpp"
 #include "yomitandicts/deinflector.hpp"
 #include "yomitandicts/importer.hpp"
 #include "yomitandicts/lookup.hpp"
@@ -49,7 +49,7 @@ void cmd_deinflect(const std::string& inflected) {
   Deinflector deinflector;
   auto results = deinflector.deinflect(inflected);
 
-  std::println("deinflections for: {} length: {}", inflected, utf8::length(inflected));
+  std::println("deinflections for: {} length: {}", inflected, utf8::distance(inflected.begin(), inflected.end()));
   std::println("found {} candidates\n", results.size());
 
   for (const auto& r : results) {
@@ -67,7 +67,7 @@ void cmd_deinflect(const std::string& inflected) {
 void cmd_preprocess(const std::string& text) {
   auto results = text_processor::process(text);
 
-  std::println("preproccesing for: {} length: {}", text, utf8::length(text));
+  std::println("preproccesing for: {} length: {}", text, utf8::distance(text.begin(), text.end()));
   std::println("found {} variants", results.size());
 
   for (const auto& r : results) {
@@ -80,7 +80,7 @@ void cmd_query(const std::string& db_path, const std::string& expression) {
   dict_query.add_dict(db_path);
   auto result = dict_query.query(expression);
 
-  std::println("query results for: {} length: {}", expression, utf8::length(expression));
+  std::println("query results for: {} length: {}", expression, utf8::distance(expression.begin(), expression.end()));
   std::println("{} entries", result.size());
   for (const auto& r : result) {
     std::println("---------------------------------------------------------------");

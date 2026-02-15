@@ -1,13 +1,13 @@
 #include "text_processor.hpp"
 
+#include <utf8.h>
+
 #include <functional>
 #include <map>
 #include <ranges>
 #include <string>
 #include <unordered_map>
 #include <utility>
-
-#include <utf8.h>
 
 namespace {
 struct TextProcessor {
@@ -154,7 +154,7 @@ std::vector<TextVariant> text_processor::process(const std::string& src) {
     variants = std::move(next);
   }
 
-  return variants
-      | std::views::transform([](const auto& v) { return TextVariant{utf8::utf32to8(v.first), v.second}; })
-      | std::ranges::to<std::vector>();
+  return variants |
+         std::views::transform([](const auto& v) { return TextVariant{utf8::utf32to8(v.first), v.second}; }) |
+         std::ranges::to<std::vector>();
 }

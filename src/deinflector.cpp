@@ -1,8 +1,8 @@
 #include "yomitandicts/deinflector.hpp"
 
-#include <algorithm>
+#include <utf8.h>
 
-#include "utf8.hpp"
+#include <algorithm>
 Deinflector::Deinflector() : max_length_(0) { init_transforms(); }
 
 static constexpr std::string_view shimau_english_description =
@@ -117,8 +117,9 @@ void Deinflector::init_transforms() {
   add_rule({.from = "来ちまう", .to = "来る", .conditions_in = V5, .conditions_out = VK, .group_id = id});
   add_rule({.from = "來ちまう", .to = "來る", .conditions_in = V5, .conditions_out = VK, .group_id = id});
 
-  id = add_group({.name = "-しまう",
-                  .description = std::string(shimau_english_description) + "Usage: Attach しまう after the て-form of verbs."});
+  id = add_group(
+      {.name = "-しまう",
+       .description = std::string(shimau_english_description) + "Usage: Attach しまう after the て-form of verbs."});
   add_rule({.from = "てしまう", .to = "て", .conditions_in = V5, .conditions_out = TE, .group_id = id});
   add_rule({.from = "でしまう", .to = "で", .conditions_in = V5, .conditions_out = TE, .group_id = id});
 
@@ -872,13 +873,13 @@ int Deinflector::add_group(const TransformGroup& group) {
 
 void Deinflector::add_rule(const Rule& rule) {
   transforms_[rule.from].emplace_back(rule);
-  max_length_ = std::max(utf8::length(rule.from), max_length_);
+  max_length_ = std::max(static_cast<size_t>(utf8::distance(rule.from.begin(), rule.from.end())), max_length_);
 }
 
 std::vector<DeinflectionResult> Deinflector::deinflect(const std::string& text) const {
   std::vector<DeinflectionResult> result{};
   std::vector<TransformGroup> trace{};
-  size_t text_len = utf8::length(text);
+  size_t text_len = utf8::distance(text.begin(), text.end());
   if (text_len > 1) {
     deinflect_recursive(text, NONE, trace, result);
   } else {
@@ -910,33 +911,36 @@ uint32_t Deinflector::pos_to_conditions(const std::vector<std::string>& part_of_
 
 void Deinflector::deinflect_recursive(const std::string& text, uint32_t conditions, std::vector<TransformGroup>& trace,
                                       std::vector<DeinflectionResult>& results) const {
-  size_t text_len = utf8::length(text);
+  size_t text_len = utf8::distance(text.begin(), text.end());
   if (text_len <= 1) {
     return;
   }
   results.emplace_back(text, conditions, trace);
 
-  for (size_t i = std::min(max_length_, text_len); i > 0; i--) {
-    size_t prefix_chars = text_len - i;
-    size_t prefix_bytes = utf8::byte_position(text, prefix_chars);
+  size_t start = std::min(max_length_, text_len);
+  auto prefix_it = text.begin();
+  utf8::advance(prefix_it, text_len - start, text.end());
 
-    std::string suffix = text.substr(prefix_bytes);
+  for (size_t i = start; i > 0; i--) {
+    std::string suffix(prefix_it, text.end());
     auto it = transforms_.find(suffix);
-    if (it == transforms_.end()) {
-      continue;
+    if (it != transforms_.end()) {
+      std::string prefix(text.begin(), prefix_it);
+      for (const auto& rule : it->second) {
+        if (conditions != NONE && !(conditions & rule.conditions_in)) {
+          continue;
+        }
+
+        std::string transformed = prefix + rule.to;
+
+        trace.emplace_back(groups_[rule.group_id]);
+        deinflect_recursive(transformed, rule.conditions_out, trace, results);
+        trace.pop_back();
+      }
     }
 
-    std::string prefix = text.substr(0, prefix_bytes);
-    for (const auto& rule : it->second) {
-      if (conditions != NONE && !(conditions & rule.conditions_in)) {
-        continue;
-      }
-
-      std::string transformed = prefix + rule.to;
-
-      trace.emplace_back(groups_[rule.group_id]);
-      deinflect_recursive(transformed, rule.conditions_out, trace, results);
-      trace.pop_back();
+    if (i > 1) {
+      utf8::next(prefix_it, text.end());
     }
   }
 }
