@@ -1,6 +1,8 @@
 #pragma once
+#include <glaze/core/common.hpp>
 #include <string_view>
 #include <vector>
+#include <glaze/glaze.hpp>
 
 struct Index {
   std::string_view title;
@@ -17,7 +19,7 @@ struct Term {
   std::string_view definition_tags;
   std::string_view rules;
   int score = 0;
-  std::string_view glossary;
+  glz::raw_json_view glossary;
   int sequence = 0;
   std::string_view term_tags;
 };
@@ -36,12 +38,17 @@ struct Tag {
   int score = 0;
 };
 
+struct ParsedFrequency {
+  std::string_view reading;
+  int value;
+  std::string display_value;
+};
 
 namespace yomitan_parser {
   bool parse_index(std::string_view content, Index& out);
   bool parse_term_bank(std::string_view content, std::vector<Term>& out);
   bool parse_meta_bank(std::string_view content, std::vector<Meta>& out);
   bool parse_tag_bank(std::string_view content, std::vector<Tag>& out);
-  // bool parse_frequency(std::string_view content, ParsedFrequency& out);
+  bool parse_frequency(std::string_view content, ParsedFrequency& out);
   // bool parse_pitch(std::string_view content, ParsedPitch& out);
 };

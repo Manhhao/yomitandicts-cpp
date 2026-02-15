@@ -2,12 +2,6 @@
 #include <string_view>
 #include <vector>
 
-struct ParsedFrequency {
-  std::string_view reading;
-  int value;
-  std::string display_value;
-};
-
 struct ParsedPitch {
   std::string_view reading;
   std::vector<int> pitches;
@@ -16,7 +10,6 @@ struct ParsedPitch {
 class YomitanJSONParser {
  public:
   YomitanJSONParser(std::string_view content);
-  bool parse_frequency(ParsedFrequency& out);
   bool parse_pitch(ParsedPitch& out);
 
  private:

@@ -1,6 +1,7 @@
 #include "yomitan_parser.hpp"
 
-#include <glaze/glaze.hpp>
+#include <string_view>
+#include <variant>
 
 template <>
 struct glz::meta<Index> {
@@ -13,12 +14,9 @@ struct glz::meta<Index> {
 template <>
 struct glz::meta<Term> {
   using T = Term;
-  static constexpr auto value = array(
-      glz::raw_string<&T::expression>, glz::raw_string<&T::reading>, glz::raw_string<&T::definition_tags>,
-      glz::raw_string<&T::rules>, &T::score,
-      // this line of code is a certified c++ moment
-      [](T& t) -> glz::raw_json_view& { return reinterpret_cast<glz::raw_json_view&>(t.glossary); }, &T::sequence,
-      glz::raw_string<&T::term_tags>);
+  static constexpr auto value =
+      array(glz::raw_string<&T::expression>, glz::raw_string<&T::reading>, glz::raw_string<&T::definition_tags>,
+            glz::raw_string<&T::rules>, &T::score, &T::glossary, &T::sequence, glz::raw_string<&T::term_tags>);
 };
 
 template <>
@@ -33,6 +31,30 @@ struct glz::meta<Tag> {
   using T = Tag;
   static constexpr auto value =
       array(glz::raw_string<&T::name>, glz::raw_string<&T::category>, &T::order, glz::raw_string<&T::notes>, &T::score);
+};
+
+namespace internal {
+struct FrequencyValue {
+  int value;
+  std::string display_value;
+};
+
+struct ParsedFrequency {
+  std::optional<std::string_view> reading;
+  std::variant<int, FrequencyValue> frequency;
+};
+};
+
+template <>
+struct glz::meta<internal::FrequencyValue> {
+  using T = internal::FrequencyValue;
+  static constexpr auto value = object("value", &T::value, "displayValue", &T::display_value);
+};
+
+template <>
+struct glz::meta<internal::ParsedFrequency> {
+  using T = internal::ParsedFrequency;
+  static constexpr auto value = object("reading", &T::reading, "frequency", &T::frequency);
 };
 
 bool yomitan_parser::parse_index(std::string_view content, Index& out) {
@@ -53,4 +75,33 @@ bool yomitan_parser::parse_meta_bank(std::string_view content, std::vector<Meta>
 bool yomitan_parser::parse_tag_bank(std::string_view content, std::vector<Tag>& out) {
   auto error = glz::read<glz::opts{.error_on_unknown_keys = false, .error_on_missing_keys = false}>(out, content);
   return !error;
+}
+
+bool yomitan_parser::parse_frequency(std::string_view content, ParsedFrequency& out) {
+  int val;
+  auto error = glz::read_json(val, content);
+  if (!error) {
+    out.value = val;
+    out.display_value = std::to_string(val);
+    out.reading = "";
+    return true;
+  }
+
+  internal::ParsedFrequency parsed;
+  error = glz::read<glz::opts{.error_on_unknown_keys = false, .error_on_missing_keys = false}>(parsed, content);
+  if (error) {
+    return false;
+  }
+  
+  out.reading = parsed.reading.value_or("");
+  if (std::holds_alternative<int>(parsed.frequency)) {
+    int freq = std::get<int>(parsed.frequency);
+    out.value = freq;
+    out.display_value = std::to_string(freq);
+  } else {
+    auto& freq = std::get<internal::FrequencyValue>(parsed.frequency);
+    out.value = freq.value;
+    out.display_value = freq.display_value;
+  }
+  return true;
 }

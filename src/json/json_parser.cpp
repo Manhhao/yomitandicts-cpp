@@ -15,59 +15,6 @@ YomitanJSONParser::YomitanJSONParser(std::string_view content) : src_(content), 
   }
 }
 
-bool YomitanJSONParser::parse_frequency(ParsedFrequency& out) {
-  if (pos_ < src_.size() && is_digit(src_[pos_])) {
-    out.value = parse_number();
-    out.display_value = std::to_string(out.value);
-    return true;
-  }
-
-  if (!expect('{')) {
-    return false;
-  }
-  pos_++;
-
-  int level = 1;
-  while (pos_ < src_.size()) {
-    if (src_[pos_] == '}') {
-      pos_++;
-      level--;
-      if (level == 0) {
-        break;
-      }
-      continue;
-    }
-    std::string_view key = parse_string();
-    if (!expect(':')) {
-      return false;
-    }
-    pos_++;
-    if (key == "reading") {
-      out.reading = parse_string();
-      consume_comma();
-    } else if (key == "frequency") {
-      consume_whitespace();
-      if (pos_ < src_.size() && is_digit(src_[pos_])) {
-        out.value = parse_number();
-        out.display_value = std::to_string(out.value);
-        consume_comma();
-      } else if (expect('{')) {
-        pos_++;
-        level++;
-      } else {
-        return false;
-      }
-    } else if (key == "value") {
-      out.value = parse_number();
-      consume_comma();
-    } else if (key == "displayValue") {
-      out.display_value = parse_string();
-      consume_comma();
-    }
-  }
-  return level == 0;
-}
-
 bool YomitanJSONParser::parse_pitch(ParsedPitch& out) {
   if (!expect('{')) {
     return false;
