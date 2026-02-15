@@ -4,7 +4,6 @@
 #include <zip.h>
 #include <zstd.h>
 
-#include <cstddef>
 #include <filesystem>
 #include <future>
 #include <string>
@@ -162,6 +161,10 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<int>& files, Imp
         }
       }));
     }
+    for (const auto& f : futures) {
+      f.wait();
+    }
+
 
     for (size_t i = 0; i < out.size(); ++i) {
       const auto& term = out[i];
