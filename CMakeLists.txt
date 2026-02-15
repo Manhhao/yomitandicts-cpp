@@ -43,3 +43,11 @@ target_link_libraries(yomitandicts-cpp PRIVATE
     glaze::glaze
     yomitandicts
 )
+
+add_executable(benchmark-import
+    tests/import.cpp
+)
+
+target_link_libraries(benchmark-import PRIVATE
+    yomitandicts
+)
