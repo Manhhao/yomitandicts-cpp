@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
   const double total = std::accumulate(durations.begin(), durations.end(), 0.0);
   const double average = total / durations.size();
 
-  std::println("results\n dict: {} iterations {}:", dict_title, iterations);
+  std::println("dict: {} iterations {}:", dict_title, iterations);
   std::println("total: {:.2f}ms", total);
   std::println("avg: {:.2f}ms", average);
   std::println("min: {:.2f}ms", *max);
