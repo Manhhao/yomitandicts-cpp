@@ -151,7 +151,7 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<int>& files, Imp
       sqlite3_bind_text(stmt, 4, term.rules.data(), static_cast<int>(term.rules.size()), SQLITE_STATIC);
       sqlite3_bind_int(stmt, 5, term.score);
 
-      std::vector<char> compressed = compress_glossary(term.glossary.data(), term.glossary.size());
+      std::vector<char> compressed = compress_glossary(term.glossary.str.data(), term.glossary.str.size());
       sqlite3_bind_blob(stmt, 6, compressed.data(), static_cast<int>(compressed.size()), SQLITE_TRANSIENT);
 
       sqlite3_bind_int(stmt, 7, term.sequence);

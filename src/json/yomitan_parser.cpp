@@ -43,6 +43,15 @@ struct ParsedFrequency {
   std::optional<std::string_view> reading;
   std::variant<int, FrequencyValue> frequency;
 };
+
+struct PitchesArray {
+  int position = 0;
+};
+
+struct ParsedPitch {
+  std::string_view reading;
+  std::vector<PitchesArray> pitches;
+};
 };
 
 template <>
@@ -55,6 +64,18 @@ template <>
 struct glz::meta<internal::ParsedFrequency> {
   using T = internal::ParsedFrequency;
   static constexpr auto value = object("reading", &T::reading, "frequency", &T::frequency);
+};
+
+template <>
+struct glz::meta<internal::PitchesArray> {
+  using T = internal::PitchesArray;
+  static constexpr auto value = object("position", &T::position);
+};
+
+template <>
+struct glz::meta<internal::ParsedPitch> {
+  using T = internal::ParsedPitch;
+  static constexpr auto value = object("reading", glz::raw_string<&T::reading>, "pitches", &T::pitches);
 };
 
 bool yomitan_parser::parse_index(std::string_view content, Index& out) {
@@ -92,7 +113,7 @@ bool yomitan_parser::parse_frequency(std::string_view content, ParsedFrequency& 
   if (error) {
     return false;
   }
-  
+
   out.reading = parsed.reading.value_or("");
   if (std::holds_alternative<int>(parsed.frequency)) {
     int freq = std::get<int>(parsed.frequency);
@@ -101,7 +122,20 @@ bool yomitan_parser::parse_frequency(std::string_view content, ParsedFrequency& 
   } else {
     auto& freq = std::get<internal::FrequencyValue>(parsed.frequency);
     out.value = freq.value;
-    out.display_value = freq.display_value;
+    out.display_value = freq.display_value.empty() ? std::to_string(freq.value) : freq.display_value;
   }
+  return true;
+}
+
+bool yomitan_parser::parse_pitch(std::string_view content, ParsedPitch& out) {
+  internal::ParsedPitch parsed;
+  auto error = glz::read<glz::opts{.error_on_unknown_keys = false, .error_on_missing_keys = false}>(parsed, content);
+  if (error) {
+    return false;
+  }
+
+  out.reading = parsed.reading;
+  out.pitches =
+      parsed.pitches | std::views::transform(&internal::PitchesArray::position) | std::ranges::to<std::vector>();
   return true;
 }

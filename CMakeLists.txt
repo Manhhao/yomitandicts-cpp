@@ -16,7 +16,6 @@ target_compile_definitions(zip PRIVATE MINIZ_DISABLE_ZIP_READER_CRC32_CHECKS)
 
 add_library(yomitandicts
     src/importer.cpp
-    src/json/json_parser.cpp
     src/json/yomitan_parser.cpp
     src/text_processor/text_processor.cpp
     src/deinflector.cpp
@@ -41,5 +40,6 @@ add_executable(yomitandicts-cpp
 )
 
 target_link_libraries(yomitandicts-cpp PRIVATE
+    glaze::glaze
     yomitandicts
 )

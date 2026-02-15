@@ -7,7 +7,7 @@
 #include <map>
 #include <ranges>
 
-#include "json/json_parser.hpp"
+#include "json/yomitan_parser.hpp"
 
 DictionaryQuery::~DictionaryQuery() {
   for (auto& [name, styles, db, stmt] : dicts_) {
@@ -191,9 +191,7 @@ void DictionaryQuery::query_freq(std::vector<TermResult>& terms) const {
         const char* data = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
 
         ParsedFrequency parsed;
-        YomitanJSONParser parser(data);
-
-        if (parser.parse_frequency(parsed)) {
+        if (yomitan_parser::parse_frequency(data, parsed)) {
           if (!parsed.reading.empty() && parsed.reading != term.reading) {
             continue;
           }
@@ -219,9 +217,7 @@ void DictionaryQuery::query_pitch(std::vector<TermResult>& terms) const {
         const char* data = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
 
         ParsedPitch parsed;
-        YomitanJSONParser parser(data);
-
-        if (parser.parse_pitch(parsed)) {
+        if (yomitan_parser::parse_pitch(data, parsed)) {
           if (!parsed.reading.empty() && parsed.reading != term.reading) {
             continue;
           }
