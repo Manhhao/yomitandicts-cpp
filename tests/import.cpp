@@ -18,6 +18,9 @@ int main(int argc, char** argv) {
   std::vector<double> durations;
   std::string dict_title;
   size_t term_count = 0;
+  size_t meta_count = 0;
+  size_t tag_count = 0;
+
   for (int i = 0; i < iterations; ++i) {
     const auto start = std::chrono::high_resolution_clock::now();
     const auto result = dictionary_importer::import(zip_path, ".");
@@ -29,6 +32,8 @@ int main(int argc, char** argv) {
       }
       if (term_count == 0) {
         term_count = result.term_count;
+        meta_count = result.meta_count;
+        tag_count = result.tag_count;
       }
       const std::chrono::duration<double, std::milli> elapsed = end - start;
       durations.push_back(elapsed.count());
@@ -46,6 +51,8 @@ int main(int argc, char** argv) {
 
   std::println("dict: {} iterations: {}", dict_title, iterations);
   std::println("term_count: {}", term_count);
+  std::println("meta_count: {}", meta_count);
+  std::println("tag_count: {}", tag_count);
   std::println("total: {:.2f}ms", total);
   std::println("avg: {:.2f}ms", average);
   std::println("min: {:.2f}ms", *min);

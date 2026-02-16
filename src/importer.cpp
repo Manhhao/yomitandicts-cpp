@@ -133,7 +133,7 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<int>& files, Imp
 
   sqlite3_stmt* stmt;
   sqlite3_prepare_v2(db, "INSERT INTO terms VALUES (?, ?, ?, ?, ?, ?, ?, ?)", -1, &stmt, nullptr);
-  
+
   const size_t num_threads = std::max(1U, std::thread::hardware_concurrency() - 1);
   for (int index : files) {
     std::string content = read_file_by_index(archive, index);
@@ -164,7 +164,6 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<int>& files, Imp
     for (const auto& f : futures) {
       f.wait();
     }
-
 
     for (size_t i = 0; i < out.size(); ++i) {
       const auto& term = out[i];
@@ -210,7 +209,7 @@ void store_meta(sqlite3* db, zip_t* archive, const std::vector<int>& files, Impo
     for (const auto& meta : out) {
       sqlite3_bind_text(stmt, 1, meta.expression.data(), static_cast<int>(meta.expression.size()), SQLITE_STATIC);
       sqlite3_bind_text(stmt, 2, meta.mode.data(), static_cast<int>(meta.mode.size()), SQLITE_STATIC);
-      sqlite3_bind_text(stmt, 3, meta.data.data(), static_cast<int>(meta.data.size()), SQLITE_STATIC);
+      sqlite3_bind_text(stmt, 3, meta.data.str.data(), static_cast<int>(meta.data.str.size()), SQLITE_STATIC);
 
       sqlite3_step(stmt);
       sqlite3_reset(stmt);

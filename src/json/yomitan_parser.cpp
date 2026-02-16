@@ -22,8 +22,7 @@ struct glz::meta<Term> {
 template <>
 struct glz::meta<Meta> {
   using T = Meta;
-  static constexpr auto value =
-      array(glz::raw_string<&T::expression>, glz::raw_string<&T::mode>, glz::raw_string<&T::data>);
+  static constexpr auto value = array(glz::raw_string<&T::expression>, glz::raw_string<&T::mode>, &T::data);
 };
 
 template <>
