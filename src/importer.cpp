@@ -158,10 +158,11 @@ void compress_glossary(const char* src, size_t size, std::vector<char>& compress
 
 void init_db(sqlite3* db) {
   sqlite3_exec(db,
-               "PRAGMA journal_mode=MEMORY;"
+               "PRAGMA journal_mode=OFF;"
                "PRAGMA synchronous=OFF;"
                "PRAGMA temp_store=MEMORY;"
-               "PRAGMA cache_size=-100000;",
+               "PRAGMA cache_size=-100000;"
+               "PRAGMA page_size=65536;",
                nullptr, nullptr, nullptr);
 
   sqlite3_exec(db, R"(
