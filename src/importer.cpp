@@ -168,7 +168,11 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<int>& files, Imp
     for (size_t i = 0; i < out.size(); ++i) {
       const auto& term = out[i];
       sqlite3_bind_text(stmt, 1, term.expression.data(), static_cast<int>(term.expression.size()), SQLITE_STATIC);
-      sqlite3_bind_text(stmt, 2, term.reading.data(), static_cast<int>(term.reading.size()), SQLITE_STATIC);
+      if (term.reading.empty()) {
+        sqlite3_bind_text(stmt, 2, term.expression.data(), static_cast<int>(term.expression.size()), SQLITE_STATIC);
+      } else {
+        sqlite3_bind_text(stmt, 2, term.reading.data(), static_cast<int>(term.reading.size()), SQLITE_STATIC);
+      }
       sqlite3_bind_text(stmt, 3, term.definition_tags.data(), static_cast<int>(term.definition_tags.size()),
                         SQLITE_STATIC);
       sqlite3_bind_text(stmt, 4, term.rules.data(), static_cast<int>(term.rules.size()), SQLITE_STATIC);
