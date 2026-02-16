@@ -19,6 +19,13 @@ struct MediaFile {
   std::vector<uint8_t> blob;
 };
 
+struct ImportFiles {
+  std::vector<int> term_banks;
+  std::vector<int> meta_banks;
+  std::vector<int> tag_banks;
+  std::vector<int> media_files;
+};
+
 std::string read_file_by_index(zip_t* archive, int index) {
   if (zip_entry_openbyindex(archive, index) != 0) {
     return "";
@@ -86,36 +93,11 @@ std::optional<MediaFile> read_media_by_index(zip_t* archive, int index) {
   return out;
 }
 
-std::vector<int> get_files(zip_t* archive, std::string_view prefix) {
-  std::vector<int> indices;
-  ssize_t num_entries = zip_entries_total(archive);
+ImportFiles get_files(zip_t* archive) {
+  ImportFiles files;
+  const ssize_t num_entries = zip_entries_total(archive);
   if (num_entries < 0) {
-    return indices;
-  }
-
-  for (int i = 0; i < num_entries; ++i) {
-    if (zip_entry_openbyindex(archive, i) != 0) {
-      continue;
-    }
-
-    const char* raw_name = zip_entry_name(archive);
-    if (raw_name != nullptr) {
-      std::string_view name(raw_name);
-      if (name.starts_with(prefix)) {
-        indices.push_back(i);
-      }
-    }
-    zip_entry_close(archive);
-  }
-
-  return indices;
-}
-
-std::vector<int> get_media_files(zip_t* archive) {
-  std::vector<int> indices;
-  ssize_t num_entries = zip_entries_total(archive);
-  if (num_entries < 0) {
-    return indices;
+    return files;
   }
 
   for (int i = 0; i < num_entries; ++i) {
@@ -130,16 +112,21 @@ std::vector<int> get_media_files(zip_t* archive) {
 
     const char* raw_name = zip_entry_name(archive);
     if (raw_name != nullptr) {
-      std::string_view name(raw_name);
-      if (!(name == "styles.css" || name == "index.json" || name.starts_with("term_bank_") ||
-            name.starts_with("term_meta_bank_") || name.starts_with("tag_bank_"))) {
-        indices.push_back(i);
+      const std::string_view name(raw_name);
+      if (name.starts_with("term_bank_")) {
+        files.term_banks.push_back(i);
+      } else if (name.starts_with("term_meta_bank_")) {
+        files.meta_banks.push_back(i);
+      } else if (name.starts_with("tag_bank_")) {
+        files.tag_banks.push_back(i);
+      } else if (!(name == "styles.css" || name == "index.json")) {
+        files.media_files.push_back(i);
       }
     }
     zip_entry_close(archive);
   }
 
-  return indices;
+  return files;
 }
 
 void compress_glossary(const char* src, size_t size, std::vector<char>& compressed, ZSTD_CCtx* cctx) {
@@ -162,7 +149,7 @@ void init_db(sqlite3* db) {
                "PRAGMA synchronous=OFF;"
                "PRAGMA temp_store=MEMORY;"
                "PRAGMA cache_size=-100000;"
-               "PRAGMA page_size=65536;",
+               "PRAGMA page_size=32768;",
                nullptr, nullptr, nullptr);
 
   sqlite3_exec(db, R"(
@@ -388,16 +375,12 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
 
     store_index(db, index, styles);
 
-    auto term_banks = get_files(archive, "term_bank_");
-    auto meta_banks = get_files(archive, "term_meta_bank_");
-    auto tag_banks = get_files(archive, "tag_bank_");
-    auto media = get_media_files(archive);
-
+    const ImportFiles files = get_files(archive);
     sqlite3_exec(db, "BEGIN", nullptr, nullptr, nullptr);
-    store_terms(db, archive, term_banks, result);
-    store_meta(db, archive, meta_banks, result);
-    store_tags(db, archive, tag_banks, result);
-    store_media(db, archive, media, result);
+    store_terms(db, archive, files.term_banks, result);
+    store_meta(db, archive, files.meta_banks, result);
+    store_tags(db, archive, files.tag_banks, result);
+    store_media(db, archive, files.media_files, result);
     sqlite3_exec(db, "COMMIT", nullptr, nullptr, nullptr);
     result.success = true;
 
