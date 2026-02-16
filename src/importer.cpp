@@ -142,16 +142,18 @@ std::vector<int> get_media_files(zip_t* archive) {
   return indices;
 }
 
-std::vector<char> compress_glossary(const char* src, size_t size) {
-  size_t bound = ZSTD_compressBound(size);
-  std::vector<char> compressed(bound);
-  size_t compressed_size = ZSTD_compress(compressed.data(), bound, src, size, 1);
+void compress_glossary(const char* src, size_t size, std::vector<char>& compressed, ZSTD_CCtx* cctx) {
+  if (!cctx) {
+    return;
+  }
 
+  size_t bound = ZSTD_compressBound(size);
+  compressed.resize(bound);
+  size_t compressed_size = ZSTD_compressCCtx(cctx, compressed.data(), bound, src, size, 1);
   if (ZSTD_isError(compressed_size)) {
-    return {};
+    return;
   }
   compressed.resize(compressed_size);
-  return compressed;
 }
 
 void init_db(sqlite3* db) {
@@ -167,7 +169,7 @@ void init_db(sqlite3* db) {
             CREATE TABLE terms (expression TEXT, reading TEXT, definition_tags TEXT, rules TEXT, score INTEGER, glossary BLOB, sequence INTEGER, term_tags TEXT);
             CREATE TABLE term_meta (expression TEXT, mode TEXT, data TEXT);
             CREATE TABLE tags (name TEXT, category TEXT, sort_order INTEGER, notes TEXT, score INTEGER);
-            CREATE TABLE media (path TEXT, data BLOB);
+            CREATE TABLE media (path TEXT PRIMARY KEY, data BLOB);
         )",
                nullptr, nullptr, nullptr);
 }
@@ -217,9 +219,11 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<int>& files, Imp
         break;
       }
       futures.push_back(std::async(std::launch::async, [&glossaries, &out, start, end] {
+        ZSTD_CCtx* cctx = ZSTD_createCCtx();
         for (size_t t = start; t < end; t++) {
-          glossaries[t] = compress_glossary(out[t].glossary.str.data(), out[t].glossary.str.size());
+          compress_glossary(out[t].glossary.str.data(), out[t].glossary.str.size(), glossaries[t], cctx);
         }
+        ZSTD_freeCCtx(cctx);
       }));
     }
     for (const auto& f : futures) {
@@ -402,7 +406,6 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
     sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_meta_expression_mode ON term_meta(expression, mode);", nullptr,
                  nullptr, nullptr);
 
-    sqlite3_exec(db, "PRAGMA analyze;", nullptr, nullptr, nullptr);
   } catch (const std::exception& e) {
     result.success = false;
     result.errors.emplace_back(e.what());
