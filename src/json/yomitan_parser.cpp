@@ -38,7 +38,7 @@ struct FrequencyValue {
   std::string display_value;
 };
 
-struct ParsedFrequency {
+struct RawFrequency {
   std::optional<std::string_view> reading;
   std::variant<int, FrequencyValue> frequency;
 };
@@ -47,7 +47,7 @@ struct PitchesArray {
   int position = 0;
 };
 
-struct ParsedPitch {
+struct RawPitch {
   std::string_view reading;
   std::vector<PitchesArray> pitches;
 };
@@ -60,8 +60,8 @@ struct glz::meta<internal::FrequencyValue> {
 };
 
 template <>
-struct glz::meta<internal::ParsedFrequency> {
-  using T = internal::ParsedFrequency;
+struct glz::meta<internal::RawFrequency> {
+  using T = internal::RawFrequency;
   static constexpr auto value = object("reading", &T::reading, "frequency", &T::frequency);
 };
 
@@ -72,8 +72,8 @@ struct glz::meta<internal::PitchesArray> {
 };
 
 template <>
-struct glz::meta<internal::ParsedPitch> {
-  using T = internal::ParsedPitch;
+struct glz::meta<internal::RawPitch> {
+  using T = internal::RawPitch;
   static constexpr auto value = object("reading", glz::raw_string<&T::reading>, "pitches", &T::pitches);
 };
 
@@ -107,7 +107,7 @@ bool yomitan_parser::parse_frequency(std::string_view content, ParsedFrequency& 
     return true;
   }
 
-  internal::ParsedFrequency parsed;
+  internal::RawFrequency parsed;
   error = glz::read<glz::opts{.error_on_unknown_keys = false, .error_on_missing_keys = false}>(parsed, content);
   if (error) {
     return false;
@@ -127,7 +127,7 @@ bool yomitan_parser::parse_frequency(std::string_view content, ParsedFrequency& 
 }
 
 bool yomitan_parser::parse_pitch(std::string_view content, ParsedPitch& out) {
-  internal::ParsedPitch parsed;
+  internal::RawPitch parsed;
   auto error = glz::read<glz::opts{.error_on_unknown_keys = false, .error_on_missing_keys = false}>(parsed, content);
   if (error) {
     return false;
