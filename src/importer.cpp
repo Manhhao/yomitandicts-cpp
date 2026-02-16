@@ -14,24 +14,29 @@
 #include "json/yomitan_parser.hpp"
 
 namespace {
+struct MediaFile {
+  std::string path;
+  std::vector<uint8_t> blob;
+};
+
 std::string read_file_by_index(zip_t* archive, int index) {
   if (zip_entry_openbyindex(archive, index) != 0) {
     return "";
   }
 
-  void* buf = nullptr;
+  void* raw = nullptr;
   size_t size = 0;
-  ssize_t bytes_read = zip_entry_read(archive, &buf, &size);
+  ssize_t bytes_read = zip_entry_read(archive, &raw, &size);
   zip_entry_close(archive);
-  if (bytes_read < 0 || !buf) {
-    if (buf) {
-      free(buf);
+  if (bytes_read < 0 || !raw) {
+    if (raw) {
+      free(raw);
     }
     return "";
   }
 
-  std::string buffer(static_cast<char*>(buf), size);
-  free(buf);
+  std::unique_ptr<void, decltype(&std::free)> buf(raw, &std::free);
+  std::string buffer(static_cast<char*>(buf.get()), size);
   return buffer;
 }
 
@@ -40,21 +45,45 @@ std::string read_file_by_name(zip_t* archive, const char* name) {
     return "";
   }
 
-  void* buf = nullptr;
+  void* raw = nullptr;
   size_t size = 0;
-  ssize_t bytes_read = zip_entry_read(archive, &buf, &size);
+  ssize_t bytes_read = zip_entry_read(archive, &raw, &size);
   zip_entry_close(archive);
 
-  if (bytes_read < 0 || !buf) {
-    if (buf) {
-      free(buf);
+  if (bytes_read < 0 || !raw) {
+    if (raw) {
+      free(raw);
     }
     return "";
   }
 
-  std::string buffer(static_cast<char*>(buf), size);
-  free(buf);
+  std::unique_ptr<void, decltype(&std::free)> buf(raw, &std::free);
+  std::string buffer(static_cast<char*>(buf.get()), size);
   return buffer;
+}
+
+std::optional<MediaFile> read_media_by_index(zip_t* archive, int index) {
+  if (zip_entry_openbyindex(archive, index) != 0) {
+    return std::nullopt;
+  }
+  MediaFile out;
+
+  void* raw = nullptr;
+  size_t size = 0;
+  ssize_t bytes_read = zip_entry_read(archive, &raw, &size);
+  out.path = zip_entry_name(archive);
+  zip_entry_close(archive);
+  if (bytes_read < 0 || !raw) {
+    if (raw) {
+      free(raw);
+    }
+    return std::nullopt;
+  }
+
+  std::unique_ptr<void, decltype(&free)> buf(raw, free);
+  auto* p = static_cast<std::uint8_t*>(buf.get());
+  out.blob.assign(p, p + size);
+  return out;
 }
 
 std::vector<int> get_files(zip_t* archive, std::string_view prefix) {
@@ -73,6 +102,37 @@ std::vector<int> get_files(zip_t* archive, std::string_view prefix) {
     if (raw_name != nullptr) {
       std::string_view name(raw_name);
       if (name.starts_with(prefix)) {
+        indices.push_back(i);
+      }
+    }
+    zip_entry_close(archive);
+  }
+
+  return indices;
+}
+
+std::vector<int> get_media_files(zip_t* archive) {
+  std::vector<int> indices;
+  ssize_t num_entries = zip_entries_total(archive);
+  if (num_entries < 0) {
+    return indices;
+  }
+
+  for (int i = 0; i < num_entries; ++i) {
+    if (zip_entry_openbyindex(archive, i) != 0) {
+      continue;
+    }
+
+    if (zip_entry_isdir(archive) == 1) {
+      zip_entry_close(archive);
+      continue;
+    }
+
+    const char* raw_name = zip_entry_name(archive);
+    if (raw_name != nullptr) {
+      std::string_view name(raw_name);
+      if (!(name == "styles.css" || name == "index.json" || name.starts_with("term_bank_") ||
+            name.starts_with("term_meta_bank_") || name.starts_with("tag_bank_"))) {
         indices.push_back(i);
       }
     }
@@ -103,10 +163,11 @@ void init_db(sqlite3* db) {
                nullptr, nullptr, nullptr);
 
   sqlite3_exec(db, R"(
-            CREATE TABLE info (title TEXT, revision TEXT, version INTEGER, styles TEXT);
+            CREATE TABLE info (title TEXT, revision TEXT, format INTEGER, styles TEXT);
             CREATE TABLE terms (expression TEXT, reading TEXT, definition_tags TEXT, rules TEXT, score INTEGER, glossary BLOB, sequence INTEGER, term_tags TEXT);
             CREATE TABLE term_meta (expression TEXT, mode TEXT, data TEXT);
             CREATE TABLE tags (name TEXT, category TEXT, sort_order INTEGER, notes TEXT, score INTEGER);
+            CREATE TABLE media (path TEXT, data BLOB);
         )",
                nullptr, nullptr, nullptr);
 }
@@ -148,7 +209,7 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<int>& files, Imp
 
     std::vector<std::vector<char>> glossaries(out.size());
     std::vector<std::future<void>> futures;
-    size_t chunk_size = out.size() / num_threads;
+    size_t chunk_size = std::max<size_t>(1, out.size() / num_threads);
     for (size_t i = 0; i < num_threads; i++) {
       size_t start = i * chunk_size;
       size_t end = (i == num_threads - 1) ? out.size() : std::min(out.size(), start + chunk_size);
@@ -178,7 +239,7 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<int>& files, Imp
       sqlite3_bind_text(stmt, 4, term.rules.data(), static_cast<int>(term.rules.size()), SQLITE_STATIC);
       sqlite3_bind_int(stmt, 5, term.score);
 
-      sqlite3_bind_blob(stmt, 6, glossaries[i].data(), static_cast<int>(glossaries[i].size()), SQLITE_TRANSIENT);
+      sqlite3_bind_blob(stmt, 6, glossaries[i].data(), static_cast<int>(glossaries[i].size()), SQLITE_STATIC);
 
       sqlite3_bind_int(stmt, 7, term.sequence);
       sqlite3_bind_text(stmt, 8, term.term_tags.data(), static_cast<int>(term.term_tags.size()), SQLITE_STATIC);
@@ -256,6 +317,30 @@ void store_tags(sqlite3* db, zip_t* archive, const std::vector<int>& files, Impo
   }
   sqlite3_finalize(stmt);
 }
+
+void store_media(sqlite3* db, zip_t* archive, const std::vector<int>& files, ImportResult& result) {
+  if (files.empty()) {
+    return;
+  }
+
+  sqlite3_stmt* stmt;
+  sqlite3_prepare_v2(db, "INSERT INTO media VALUES (?, ?)", -1, &stmt, nullptr);
+
+  for (int index : files) {
+    auto media = read_media_by_index(archive, index);
+    if (!media.has_value()) {
+      continue;
+    }
+
+    sqlite3_bind_text(stmt, 1, media->path.data(), static_cast<int>(media->path.size()), SQLITE_STATIC);
+    sqlite3_bind_blob(stmt, 2, media->blob.data(), static_cast<int>(media->blob.size()), SQLITE_STATIC);
+
+    sqlite3_step(stmt);
+    sqlite3_reset(stmt);
+    result.media_count++;
+  }
+  sqlite3_finalize(stmt);
+}
 }
 
 ImportResult dictionary_importer::import(const std::string& zip_path, const std::string& output_dir) {
@@ -301,11 +386,13 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
     auto term_banks = get_files(archive, "term_bank_");
     auto meta_banks = get_files(archive, "term_meta_bank_");
     auto tag_banks = get_files(archive, "tag_bank_");
+    auto media = get_media_files(archive);
 
     sqlite3_exec(db, "BEGIN", nullptr, nullptr, nullptr);
     store_terms(db, archive, term_banks, result);
     store_meta(db, archive, meta_banks, result);
     store_tags(db, archive, tag_banks, result);
+    store_media(db, archive, media, result);
     sqlite3_exec(db, "COMMIT", nullptr, nullptr, nullptr);
     result.success = true;
 

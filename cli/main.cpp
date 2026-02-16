@@ -37,6 +37,7 @@ void cmd_import(const std::string& path) {
     std::println("term_count: {}", result.term_count);
     std::println("meta_count: {}", result.meta_count);
     std::println("tag_count: {}", result.tag_count);
+    std::println("media_count: {}", result.media_count);
   } else {
     std::println(stderr, "could not import dictionary:");
     for (const auto& error : result.errors) {
