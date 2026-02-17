@@ -38,6 +38,12 @@ struct FrequencyValue {
   std::string display_value;
 };
 
+struct RawFrequencyFlat {
+  std::optional<std::string_view> reading;
+  int value;
+  std::optional<std::string> display_value;
+};
+
 struct RawFrequency {
   std::optional<std::string_view> reading;
   std::variant<int, FrequencyValue> frequency;
@@ -51,6 +57,12 @@ struct RawPitch {
   std::string_view reading;
   std::vector<PitchesArray> pitches;
 };
+};
+
+template <>
+struct glz::meta<internal::RawFrequencyFlat> {
+  using T = internal::RawFrequencyFlat;
+  static constexpr auto value = object("reading", &T::reading, "value", &T::value, "displayValue", &T::display_value);
 };
 
 template <>
@@ -98,8 +110,17 @@ bool yomitan_parser::parse_tag_bank(std::string_view content, std::vector<Tag>& 
 }
 
 bool yomitan_parser::parse_frequency(std::string_view content, ParsedFrequency& out) {
+  internal::RawFrequencyFlat parsed_flat;
+  auto error = glz::read<glz::opts{.error_on_unknown_keys = false, .error_on_missing_keys = true}>(parsed_flat, content);
+  if (!error) {
+    out.reading = parsed_flat.reading.value_or("");
+    out.value = parsed_flat.value;
+    out.display_value = parsed_flat.display_value.value_or(std::to_string(parsed_flat.value));
+    return true;
+  }
+
   int val;
-  auto error = glz::read_json(val, content);
+  error = glz::read_json(val, content);
   if (!error) {
     out.value = val;
     out.display_value = std::to_string(val);
