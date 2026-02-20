@@ -10,12 +10,13 @@ find_package(SQLite3 REQUIRED)
 find_package(zstd REQUIRED)
 
 add_subdirectory(external/zip)
+add_subdirectory(external/glaze)
 
 target_compile_definitions(zip PRIVATE MINIZ_DISABLE_ZIP_READER_CRC32_CHECKS)
 
 add_library(yomitandicts
     src/importer.cpp
-    src/json/json_parser.cpp
+    src/json/yomitan_parser.cpp
     src/text_processor/text_processor.cpp
     src/deinflector.cpp
     src/query.cpp
@@ -29,6 +30,7 @@ target_include_directories(yomitandicts PUBLIC
 
 target_link_libraries(yomitandicts PRIVATE
     zip
+    glaze::glaze
     SQLite::SQLite3
     zstd::libzstd_static
 )
@@ -38,5 +40,14 @@ add_executable(yomitandicts-cpp
 )
 
 target_link_libraries(yomitandicts-cpp PRIVATE
+    glaze::glaze
+    yomitandicts
+)
+
+add_executable(benchmark-import
+    tests/import.cpp
+)
+
+target_link_libraries(benchmark-import PRIVATE
     yomitandicts
 )

@@ -7,7 +7,7 @@
 #include <ranges>
 #include <string>
 
-#include "../src/json/json_parser.hpp"
+#include "../src/json/yomitan_parser.hpp"
 #include "../src/text_processor/text_processor.hpp"
 #include "yomitandicts/deinflector.hpp"
 #include "yomitandicts/importer.hpp"
@@ -37,6 +37,7 @@ void cmd_import(const std::string& path) {
     std::println("term_count: {}", result.term_count);
     std::println("meta_count: {}", result.meta_count);
     std::println("tag_count: {}", result.tag_count);
+    std::println("media_count: {}", result.media_count);
   } else {
     std::println(stderr, "could not import dictionary:");
     for (const auto& error : result.errors) {
@@ -115,8 +116,7 @@ void cmd_freq(const std::string& freq_db, const std::string& expression) {
     const char* data = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
     std::println("raw: {}", data);
     ParsedFrequency parsed;
-    YomitanJSONParser parser(data);
-    if (parser.parse_frequency(parsed)) {
+    if (yomitan_parser::parse_frequency(data, parsed)) {
       std::println("parsed: reading={} value={} display={}", parsed.reading, parsed.value, parsed.display_value);
     } else {
       std::println(stderr, "failed to parse");

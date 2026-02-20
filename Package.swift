@@ -36,6 +36,8 @@ let package = Package(
                 .headerSearchPath("include"),
                 .headerSearchPath("external/zip/src"),
                 .headerSearchPath("external/utfcpp/source"),
+                .headerSearchPath("external/glaze/include"),
+                .unsafeFlags(["-Wno-missing-braces"]),
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx)
@@ -45,5 +47,5 @@ let package = Package(
             ]
         ),
     ],
-    cxxLanguageStandard: .cxx23
+    cxxLanguageStandard: .cxx2b
 )

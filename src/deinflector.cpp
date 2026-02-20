@@ -3,6 +3,7 @@
 #include <utf8.h>
 
 #include <algorithm>
+#include <cstddef>
 Deinflector::Deinflector() : max_length_(0) { init_transforms(); }
 
 static constexpr std::string_view shimau_english_description =
@@ -873,7 +874,7 @@ int Deinflector::add_group(const TransformGroup& group) {
 
 void Deinflector::add_rule(const Rule& rule) {
   transforms_[rule.from].emplace_back(rule);
-  max_length_ = std::max(static_cast<size_t>(utf8::distance(rule.from.begin(), rule.from.end())), max_length_);
+  max_length_ = std::max<size_t>(utf8::distance(rule.from.begin(), rule.from.end()), max_length_);
 }
 
 std::vector<DeinflectionResult> Deinflector::deinflect(const std::string& text) const {

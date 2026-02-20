@@ -5,31 +5,45 @@
 #include <zstd.h>
 
 #include <filesystem>
+#include <future>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
-#include "json/json_parser.hpp"
+#include "json/yomitan_parser.hpp"
 
 namespace {
+struct MediaFile {
+  std::string path;
+  std::vector<uint8_t> blob;
+};
+
+struct ImportFiles {
+  std::vector<int> term_banks;
+  std::vector<int> meta_banks;
+  std::vector<int> tag_banks;
+  std::vector<int> media_files;
+};
+
 std::string read_file_by_index(zip_t* archive, int index) {
   if (zip_entry_openbyindex(archive, index) != 0) {
     return "";
   }
 
-  void* buf = nullptr;
+  void* raw = nullptr;
   size_t size = 0;
-  ssize_t bytes_read = zip_entry_read(archive, &buf, &size);
+  ssize_t bytes_read = zip_entry_read(archive, &raw, &size);
   zip_entry_close(archive);
-  if (bytes_read < 0 || !buf) {
-    if (buf) {
-      free(buf);
+  if (bytes_read < 0 || !raw) {
+    if (raw) {
+      free(raw);
     }
     return "";
   }
 
-  std::string buffer(static_cast<char*>(buf), size);
-  free(buf);
+  std::unique_ptr<void, decltype(&std::free)> buf(raw, &std::free);
+  std::string buffer(static_cast<char*>(buf.get()), size);
   return buffer;
 }
 
@@ -38,28 +52,52 @@ std::string read_file_by_name(zip_t* archive, const char* name) {
     return "";
   }
 
-  void* buf = nullptr;
+  void* raw = nullptr;
   size_t size = 0;
-  ssize_t bytes_read = zip_entry_read(archive, &buf, &size);
+  ssize_t bytes_read = zip_entry_read(archive, &raw, &size);
   zip_entry_close(archive);
 
-  if (bytes_read < 0 || !buf) {
-    if (buf) {
-      free(buf);
+  if (bytes_read < 0 || !raw) {
+    if (raw) {
+      free(raw);
     }
     return "";
   }
 
-  std::string buffer(static_cast<char*>(buf), size);
-  free(buf);
+  std::unique_ptr<void, decltype(&std::free)> buf(raw, &std::free);
+  std::string buffer(static_cast<char*>(buf.get()), size);
   return buffer;
 }
 
-std::vector<int> get_files(zip_t* archive, std::string_view prefix) {
-  std::vector<int> indices;
-  ssize_t num_entries = zip_entries_total(archive);
+std::optional<MediaFile> read_media_by_index(zip_t* archive, int index) {
+  if (zip_entry_openbyindex(archive, index) != 0) {
+    return std::nullopt;
+  }
+  MediaFile out;
+
+  void* raw = nullptr;
+  size_t size = 0;
+  ssize_t bytes_read = zip_entry_read(archive, &raw, &size);
+  out.path = zip_entry_name(archive);
+  zip_entry_close(archive);
+  if (bytes_read < 0 || !raw) {
+    if (raw) {
+      free(raw);
+    }
+    return std::nullopt;
+  }
+
+  std::unique_ptr<void, decltype(&free)> buf(raw, free);
+  auto* p = static_cast<std::uint8_t*>(buf.get());
+  out.blob.assign(p, p + size);
+  return out;
+}
+
+ImportFiles get_files(zip_t* archive) {
+  ImportFiles files;
+  const ssize_t num_entries = zip_entries_total(archive);
   if (num_entries < 0) {
-    return indices;
+    return files;
   }
 
   for (int i = 0; i < num_entries; ++i) {
@@ -67,44 +105,59 @@ std::vector<int> get_files(zip_t* archive, std::string_view prefix) {
       continue;
     }
 
+    if (zip_entry_isdir(archive) == 1) {
+      zip_entry_close(archive);
+      continue;
+    }
+
     const char* raw_name = zip_entry_name(archive);
     if (raw_name != nullptr) {
-      std::string_view name(raw_name);
-      if (name.starts_with(prefix)) {
-        indices.push_back(i);
+      const std::string_view name(raw_name);
+      if (name.starts_with("term_bank_")) {
+        files.term_banks.push_back(i);
+      } else if (name.starts_with("term_meta_bank_")) {
+        files.meta_banks.push_back(i);
+      } else if (name.starts_with("tag_bank_")) {
+        files.tag_banks.push_back(i);
+      } else if (!(name == "styles.css" || name == "index.json")) {
+        files.media_files.push_back(i);
       }
     }
     zip_entry_close(archive);
   }
 
-  return indices;
+  return files;
 }
 
-std::vector<char> compress_glossary(const char* src, size_t size) {
-  size_t bound = ZSTD_compressBound(size);
-  std::vector<char> compressed(bound);
-  size_t compressed_size = ZSTD_compress(compressed.data(), bound, src, size, 1);
+void compress_glossary(const char* src, size_t size, std::vector<char>& compressed, ZSTD_CCtx* cctx) {
+  if (!cctx) {
+    return;
+  }
 
+  size_t bound = ZSTD_compressBound(size);
+  compressed.resize(bound);
+  size_t compressed_size = ZSTD_compressCCtx(cctx, compressed.data(), bound, src, size, 1);
   if (ZSTD_isError(compressed_size)) {
-    return {};
+    return;
   }
   compressed.resize(compressed_size);
-  return compressed;
 }
 
 void init_db(sqlite3* db) {
   sqlite3_exec(db,
-               "PRAGMA journal_mode=MEMORY;"
+               "PRAGMA journal_mode=OFF;"
                "PRAGMA synchronous=OFF;"
                "PRAGMA temp_store=MEMORY;"
-               "PRAGMA cache_size=-100000;",
+               "PRAGMA cache_size=-100000;"
+               "PRAGMA page_size=32768;",
                nullptr, nullptr, nullptr);
 
   sqlite3_exec(db, R"(
-            CREATE TABLE info (title TEXT, revision TEXT, version INTEGER, styles TEXT);
+            CREATE TABLE info (title TEXT, revision TEXT, format INTEGER, styles TEXT);
             CREATE TABLE terms (expression TEXT, reading TEXT, definition_tags TEXT, rules TEXT, score INTEGER, glossary BLOB, sequence INTEGER, term_tags TEXT);
             CREATE TABLE term_meta (expression TEXT, mode TEXT, data TEXT);
             CREATE TABLE tags (name TEXT, category TEXT, sort_order INTEGER, notes TEXT, score INTEGER);
+            CREATE TABLE media (path TEXT PRIMARY KEY, data BLOB);
         )",
                nullptr, nullptr, nullptr);
 }
@@ -114,7 +167,7 @@ void store_index(sqlite3* db, const Index& index, const std::string& styles) {
   sqlite3_prepare_v2(db, "INSERT INTO info VALUES (?, ?, ?, ?)", -1, &stmt, nullptr);
   sqlite3_bind_text(stmt, 1, index.title.data(), static_cast<int>(index.title.size()), SQLITE_STATIC);
   sqlite3_bind_text(stmt, 2, index.revision.data(), static_cast<int>(index.revision.size()), SQLITE_STATIC);
-  sqlite3_bind_int(stmt, 3, index.version);
+  sqlite3_bind_int(stmt, 3, index.format);
   if (!styles.empty()) {
     sqlite3_bind_text(stmt, 4, styles.c_str(), -1, SQLITE_STATIC);
   } else {
@@ -132,24 +185,53 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<int>& files, Imp
   sqlite3_stmt* stmt;
   sqlite3_prepare_v2(db, "INSERT INTO terms VALUES (?, ?, ?, ?, ?, ?, ?, ?)", -1, &stmt, nullptr);
 
-  Term term;
+  const size_t num_threads = std::max(1U, std::thread::hardware_concurrency() - 1);
   for (int index : files) {
     std::string content = read_file_by_index(archive, index);
     if (content.empty()) {
       continue;
     }
 
-    YomitanJSONParser parser(content);
-    while (parser.parse_term(term)) {
+    std::vector<Term> out;
+    if (!yomitan_parser::parse_term_bank(content, out)) {
+      continue;
+    }
+
+    std::vector<std::vector<char>> glossaries(out.size());
+    std::vector<std::future<void>> futures;
+    size_t chunk_size = std::max<size_t>(1, out.size() / num_threads);
+    for (size_t i = 0; i < num_threads; i++) {
+      size_t start = i * chunk_size;
+      size_t end = (i == num_threads - 1) ? out.size() : std::min(out.size(), start + chunk_size);
+      if (start >= out.size()) {
+        break;
+      }
+      futures.push_back(std::async(std::launch::async, [&glossaries, &out, start, end] {
+        ZSTD_CCtx* cctx = ZSTD_createCCtx();
+        for (size_t t = start; t < end; t++) {
+          compress_glossary(out[t].glossary.str.data(), out[t].glossary.str.size(), glossaries[t], cctx);
+        }
+        ZSTD_freeCCtx(cctx);
+      }));
+    }
+    for (const auto& f : futures) {
+      f.wait();
+    }
+
+    for (size_t i = 0; i < out.size(); ++i) {
+      const auto& term = out[i];
       sqlite3_bind_text(stmt, 1, term.expression.data(), static_cast<int>(term.expression.size()), SQLITE_STATIC);
-      sqlite3_bind_text(stmt, 2, term.reading.data(), static_cast<int>(term.reading.size()), SQLITE_STATIC);
+      if (term.reading.empty()) {
+        sqlite3_bind_text(stmt, 2, term.expression.data(), static_cast<int>(term.expression.size()), SQLITE_STATIC);
+      } else {
+        sqlite3_bind_text(stmt, 2, term.reading.data(), static_cast<int>(term.reading.size()), SQLITE_STATIC);
+      }
       sqlite3_bind_text(stmt, 3, term.definition_tags.data(), static_cast<int>(term.definition_tags.size()),
                         SQLITE_STATIC);
       sqlite3_bind_text(stmt, 4, term.rules.data(), static_cast<int>(term.rules.size()), SQLITE_STATIC);
       sqlite3_bind_int(stmt, 5, term.score);
 
-      std::vector<char> compressed = compress_glossary(term.glossary.data(), term.glossary.size());
-      sqlite3_bind_blob(stmt, 6, compressed.data(), static_cast<int>(compressed.size()), SQLITE_TRANSIENT);
+      sqlite3_bind_blob(stmt, 6, glossaries[i].data(), static_cast<int>(glossaries[i].size()), SQLITE_STATIC);
 
       sqlite3_bind_int(stmt, 7, term.sequence);
       sqlite3_bind_text(stmt, 8, term.term_tags.data(), static_cast<int>(term.term_tags.size()), SQLITE_STATIC);
@@ -169,18 +251,22 @@ void store_meta(sqlite3* db, zip_t* archive, const std::vector<int>& files, Impo
 
   sqlite3_stmt* stmt;
   sqlite3_prepare_v2(db, "INSERT INTO term_meta VALUES (?, ?, ?)", -1, &stmt, nullptr);
-  Meta meta;
+
   for (int index : files) {
     std::string content = read_file_by_index(archive, index);
     if (content.empty()) {
       continue;
     }
 
-    YomitanJSONParser parser(content);
-    while (parser.parse_meta(meta)) {
+    std::vector<Meta> out;
+    if (!yomitan_parser::parse_meta_bank(content, out)) {
+      continue;
+    }
+
+    for (const auto& meta : out) {
       sqlite3_bind_text(stmt, 1, meta.expression.data(), static_cast<int>(meta.expression.size()), SQLITE_STATIC);
       sqlite3_bind_text(stmt, 2, meta.mode.data(), static_cast<int>(meta.mode.size()), SQLITE_STATIC);
-      sqlite3_bind_text(stmt, 3, meta.data.data(), static_cast<int>(meta.data.size()), SQLITE_STATIC);
+      sqlite3_bind_text(stmt, 3, meta.data.str.data(), static_cast<int>(meta.data.str.size()), SQLITE_STATIC);
 
       sqlite3_step(stmt);
       sqlite3_reset(stmt);
@@ -197,15 +283,19 @@ void store_tags(sqlite3* db, zip_t* archive, const std::vector<int>& files, Impo
 
   sqlite3_stmt* stmt;
   sqlite3_prepare_v2(db, "INSERT INTO tags VALUES (?, ?, ?, ?, ?)", -1, &stmt, nullptr);
-  Tag tag;
+
   for (int index : files) {
     std::string content = read_file_by_index(archive, index);
     if (content.empty()) {
       continue;
     }
 
-    YomitanJSONParser parser(content);
-    while (parser.parse_tag(tag)) {
+    std::vector<Tag> out;
+    if (!yomitan_parser::parse_tag_bank(content, out)) {
+      continue;
+    }
+
+    for (const auto& tag : out) {
       sqlite3_bind_text(stmt, 1, tag.name.data(), static_cast<int>(tag.name.size()), SQLITE_STATIC);
       sqlite3_bind_text(stmt, 2, tag.category.data(), static_cast<int>(tag.category.size()), SQLITE_STATIC);
       sqlite3_bind_int(stmt, 3, tag.order);
@@ -216,6 +306,30 @@ void store_tags(sqlite3* db, zip_t* archive, const std::vector<int>& files, Impo
       sqlite3_reset(stmt);
       result.tag_count++;
     }
+  }
+  sqlite3_finalize(stmt);
+}
+
+void store_media(sqlite3* db, zip_t* archive, const std::vector<int>& files, ImportResult& result) {
+  if (files.empty()) {
+    return;
+  }
+
+  sqlite3_stmt* stmt;
+  sqlite3_prepare_v2(db, "INSERT INTO media VALUES (?, ?)", -1, &stmt, nullptr);
+
+  for (int index : files) {
+    auto media = read_media_by_index(archive, index);
+    if (!media.has_value()) {
+      continue;
+    }
+
+    sqlite3_bind_text(stmt, 1, media->path.data(), static_cast<int>(media->path.size()), SQLITE_STATIC);
+    sqlite3_bind_blob(stmt, 2, media->blob.data(), static_cast<int>(media->blob.size()), SQLITE_STATIC);
+
+    sqlite3_step(stmt);
+    sqlite3_reset(stmt);
+    result.media_count++;
   }
   sqlite3_finalize(stmt);
 }
@@ -237,8 +351,7 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
     }
 
     Index index;
-    YomitanJSONParser parser(index_content);
-    if (!parser.parse_index(index)) {
+    if (!yomitan_parser::parse_index(index_content, index)) {
       throw std::runtime_error("failed to parse index.json");
     }
 
@@ -262,14 +375,12 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
 
     store_index(db, index, styles);
 
-    auto term_banks = get_files(archive, "term_bank_");
-    auto meta_banks = get_files(archive, "term_meta_bank_");
-    auto tag_banks = get_files(archive, "tag_bank_");
-
+    const ImportFiles files = get_files(archive);
     sqlite3_exec(db, "BEGIN", nullptr, nullptr, nullptr);
-    store_terms(db, archive, term_banks, result);
-    store_meta(db, archive, meta_banks, result);
-    store_tags(db, archive, tag_banks, result);
+    store_terms(db, archive, files.term_banks, result);
+    store_meta(db, archive, files.meta_banks, result);
+    store_tags(db, archive, files.tag_banks, result);
+    store_media(db, archive, files.media_files, result);
     sqlite3_exec(db, "COMMIT", nullptr, nullptr, nullptr);
     result.success = true;
 
@@ -278,8 +389,6 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
     sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_terms_reading ON terms(reading);", nullptr, nullptr, nullptr);
     sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_meta_expression_mode ON term_meta(expression, mode);", nullptr,
                  nullptr, nullptr);
-
-    sqlite3_exec(db, "PRAGMA analyze;", nullptr, nullptr, nullptr);
   } catch (const std::exception& e) {
     result.success = false;
     result.errors.emplace_back(e.what());
