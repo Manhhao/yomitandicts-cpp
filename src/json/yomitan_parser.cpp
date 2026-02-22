@@ -6,9 +6,10 @@
 template <>
 struct glz::meta<Index> {
   using T = Index;
-  static constexpr auto value = object("title", glz::raw_string<&T::title>, "revision", glz::raw_string<&T::revision>,
-                                       "format", &T::format, "isUpdatable", &T::updatable, "indexUrl",
-                                       glz::raw_string<&T::index_url>, "updateUrl", glz::raw_string<&T::download_url>);
+  static constexpr auto value =
+      object("title", glz::raw_string<&T::title>, "revision", glz::raw_string<&T::revision>, "format", &T::format,
+             "isUpdatable", &T::updatable, "indexUrl", glz::raw_string<&T::index_url>, "downloadUrl",
+             glz::raw_string<&T::download_url>);
 };
 
 template <>
@@ -111,7 +112,8 @@ bool yomitan_parser::parse_tag_bank(std::string_view content, std::vector<Tag>& 
 
 bool yomitan_parser::parse_frequency(std::string_view content, ParsedFrequency& out) {
   internal::RawFrequencyFlat parsed_flat;
-  auto error = glz::read<glz::opts{.error_on_unknown_keys = false, .error_on_missing_keys = true}>(parsed_flat, content);
+  auto error =
+      glz::read<glz::opts{.error_on_unknown_keys = false, .error_on_missing_keys = true}>(parsed_flat, content);
   if (!error) {
     out.reading = parsed_flat.reading.value_or("");
     out.value = parsed_flat.value;

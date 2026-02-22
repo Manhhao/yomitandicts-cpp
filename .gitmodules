@@ -7,3 +7,6 @@
 [submodule "external/glaze"]
 	path = external/glaze
 	url = https://github.com/stephenberry/glaze
+[submodule "external/pthash"]
+	path = external/pthash
+	url = https://github.com/jermp/pthash.git

@@ -35,7 +35,7 @@ int main(int argc, char** argv) {
       }
       const std::chrono::duration<double, std::milli> elapsed = end - start;
       durations.push_back(elapsed.count());
-      std::filesystem::remove(result.title + ".db");
+      std::filesystem::remove_all(result.title);
     }
   }
 

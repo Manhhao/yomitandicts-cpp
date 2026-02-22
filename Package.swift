@@ -41,9 +41,6 @@ let package = Package(
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx)
-            ],
-            linkerSettings: [
-                .linkedLibrary("sqlite3")
             ]
         ),
     ],

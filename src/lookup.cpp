@@ -66,9 +66,9 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
       auto deinflection_results = deinflector_.deinflect(variant.text);
       for (auto& deinflection : deinflection_results) {
         auto terms = query_.query(deinflection.text);
+        filter_by_pos(terms, deinflection);
 
-        std::vector<TermResult> term_results = filter_by_pos(terms, deinflection);
-        for (const auto& term : term_results) {
+        for (const auto& term : terms) {
           // deduplicate glossaries
           auto key = std::make_pair(term.expression, term.reading);
           auto it = result_map.find(key);
@@ -122,27 +122,23 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
     return freq_sort_order(a, b, freq_dict_order);
   });
 
-  if (results.size() > max_results) {
+  if (results.size() > static_cast<size_t>(max_results)) {
     results.resize(max_results);
   }
 
   return results;
 }
 
-std::vector<TermResult> Lookup::filter_by_pos(const std::vector<TermResult>& terms, const DeinflectionResult& d) {
-  std::vector<TermResult> filtered_results{};
-  for (const auto& term : terms) {
-    const auto& pos_source = term.rules.empty() ? term.definition_tags : term.rules;
-    auto dict_conditions = Deinflector::pos_to_conditions(split_whitespace(pos_source));
-    // this should support dictionaries without deinflection support because:
-    // word needs conditions -> dict has an entry but doesn't have conditions
-    // => we give the dict the benefit of the doubt
-    // if a dict does define conditions, we execute the normal check
-    if (d.conditions != 0 && dict_conditions != 0 && (dict_conditions & d.conditions) == 0) {
-      continue;
-    }
-
-    filtered_results.push_back(term);
+void Lookup::filter_by_pos(std::vector<TermResult>& terms, const DeinflectionResult& d) {
+  if (d.conditions == 0) {
+    return;
   }
-  return filtered_results;
+  // this should support dictionaries without deinflection support because:
+  // word needs conditions -> dict has an entry but doesn't have conditions
+  // => we give the dict the benefit of the doubt
+  // if a dict does define conditions, we execute the normal check
+  std::erase_if(terms, [&](const TermResult& term) {
+    auto dict_conditions = Deinflector::pos_to_conditions(split_whitespace(term.rules));
+    return dict_conditions != 0 && (dict_conditions & d.conditions) == 0;
+  });
 }
