@@ -68,6 +68,9 @@ struct DictionaryQuery::DictionaryData {
 DictionaryQuery::DictionaryQuery() = default;
 DictionaryQuery::~DictionaryQuery() = default;
 
+DictionaryQuery::DictionaryQuery(DictionaryQuery&&) noexcept = default;
+DictionaryQuery& DictionaryQuery::operator=(DictionaryQuery&&) noexcept = default;
+
 void DictionaryQuery::add_dict(const std::string& path, DictionaryType type) {
   Dictionary dict;
   Index info;

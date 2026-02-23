@@ -48,8 +48,8 @@ class DictionaryQuery {
   DictionaryQuery(const DictionaryQuery&) = delete;
   DictionaryQuery& operator=(const DictionaryQuery&) = delete;
 
-  DictionaryQuery(DictionaryQuery&&) = default;
-  DictionaryQuery& operator=(DictionaryQuery&&) = default;
+  DictionaryQuery(DictionaryQuery&&) noexcept;
+  DictionaryQuery& operator=(DictionaryQuery&&) noexcept;
 
   void add_term_dict(const std::string& path);
   void add_freq_dict(const std::string& path);
