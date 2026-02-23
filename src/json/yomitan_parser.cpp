@@ -15,7 +15,7 @@ template <>
 struct glz::meta<Term> {
   using T = Term;
   static constexpr auto value =
-      array(glz::raw_string<&T::expression>, glz::raw_string<&T::reading>, glz::raw_string<&T::definition_tags>,
+      array(glz::raw_string<&T::expression>, glz::raw_string<&T::reading>, &T::definition_tags,
             glz::raw_string<&T::rules>, &T::score, &T::glossary, &T::sequence, glz::raw_string<&T::term_tags>);
 };
 
@@ -111,7 +111,8 @@ bool yomitan_parser::parse_tag_bank(std::string_view content, std::vector<Tag>& 
 
 bool yomitan_parser::parse_frequency(std::string_view content, ParsedFrequency& out) {
   internal::RawFrequencyFlat parsed_flat;
-  auto error = glz::read<glz::opts{.error_on_unknown_keys = false, .error_on_missing_keys = true}>(parsed_flat, content);
+  auto error =
+      glz::read<glz::opts{.error_on_unknown_keys = false, .error_on_missing_keys = true}>(parsed_flat, content);
   if (!error) {
     out.reading = parsed_flat.reading.value_or("");
     out.value = parsed_flat.value;

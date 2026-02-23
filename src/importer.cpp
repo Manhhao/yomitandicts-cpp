@@ -220,13 +220,14 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<int>& files, Imp
 
     for (size_t i = 0; i < out.size(); ++i) {
       const auto& term = out[i];
+      std::string_view definition_tags = term.definition_tags.value_or("");
       sqlite3_bind_text(stmt, 1, term.expression.data(), static_cast<int>(term.expression.size()), SQLITE_STATIC);
       if (term.reading.empty()) {
         sqlite3_bind_text(stmt, 2, term.expression.data(), static_cast<int>(term.expression.size()), SQLITE_STATIC);
       } else {
         sqlite3_bind_text(stmt, 2, term.reading.data(), static_cast<int>(term.reading.size()), SQLITE_STATIC);
       }
-      sqlite3_bind_text(stmt, 3, term.definition_tags.data(), static_cast<int>(term.definition_tags.size()),
+      sqlite3_bind_text(stmt, 3, definition_tags.data(), static_cast<int>(definition_tags.size()),
                         SQLITE_STATIC);
       sqlite3_bind_text(stmt, 4, term.rules.data(), static_cast<int>(term.rules.size()), SQLITE_STATIC);
       sqlite3_bind_int(stmt, 5, term.score);

@@ -15,7 +15,7 @@ struct Index {
 struct Term {
   std::string_view expression;
   std::string_view reading;
-  std::string_view definition_tags;
+  std::optional<std::string_view> definition_tags;
   std::string_view rules;
   int score = 0;
   glz::raw_json_view glossary;
