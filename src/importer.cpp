@@ -229,6 +229,7 @@ ProcessedFile process_term_bank(const std::string& content) {
     std::string_view expr = term.expression;
     std::string_view reading = term.reading.empty() ? expr : term.reading;
     std::string_view blob{compressed.data(), compressed_size};
+    std::string_view definition_tags = term.definition_tags.value_or("");
 
     write_u8(processed.data, 0);
     write_u16(processed.data, expr.size());
@@ -237,8 +238,8 @@ ProcessedFile process_term_bank(const std::string& content) {
     write_str(processed.data, reading);
     write_u32(processed.data, blob.size());
     write_str(processed.data, blob);
-    write_u8(processed.data, term.definition_tags.size());
-    write_str(processed.data, term.definition_tags);
+    write_u8(processed.data, definition_tags.size());
+    write_str(processed.data, definition_tags);
     write_u8(processed.data, term.rules.size());
     write_str(processed.data, term.rules);
     write_u8(processed.data, term.term_tags.size());
