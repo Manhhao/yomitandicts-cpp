@@ -53,3 +53,11 @@ add_executable(benchmark-import
 target_link_libraries(benchmark-import PRIVATE
     yomitandicts
 )
+
+add_executable(benchmark-lookup
+    benchmark/lookup.cpp
+)
+
+target_link_libraries(benchmark-lookup PRIVATE
+    yomitandicts
+)
