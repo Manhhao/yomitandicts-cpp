@@ -471,7 +471,7 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
     std::ofstream offs(path + "/offsets.bin", std::ios::binary);
     setup_stream_exceptions(offs);
     offs.write(reinterpret_cast<const char*>(offset_hash_table.data()),
-              static_cast<std::streamsize>(offset_hash_table.size() * sizeof(uint64_t)));
+               static_cast<std::streamsize>(offset_hash_table.size() * sizeof(uint64_t)));
 
     write_media(path, archive, files.media_files, result);
 
@@ -483,6 +483,10 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
 
   if (archive) {
     zip_close(archive);
+  }
+
+  if (!result.success && !result.title.empty()) {
+    std::filesystem::remove_all(std::filesystem::path(output_dir) / result.title);
   }
 
   return result;
