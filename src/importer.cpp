@@ -234,7 +234,7 @@ void store_terms(sqlite3* db, zip_t* archive, const std::vector<int>& files, Imp
 
       sqlite3_bind_blob(stmt, 6, glossaries[i].data(), static_cast<int>(glossaries[i].size()), SQLITE_STATIC);
 
-      sqlite3_bind_int(stmt, 7, term.sequence);
+      sqlite3_bind_int64(stmt, 7, term.sequence);
       sqlite3_bind_text(stmt, 8, term.term_tags.data(), static_cast<int>(term.term_tags.size()), SQLITE_STATIC);
 
       sqlite3_step(stmt);

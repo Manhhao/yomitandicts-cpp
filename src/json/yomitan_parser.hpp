@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <glaze/glaze.hpp>
 #include <string_view>
 #include <vector>
@@ -19,7 +20,7 @@ struct Term {
   std::string_view rules;
   int score = 0;
   glz::raw_json_view glossary;
-  int sequence = 0;
+  int64_t sequence = 0;
   std::string_view term_tags;
 };
 
