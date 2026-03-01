@@ -16,7 +16,7 @@ template <>
 struct glz::meta<Term> {
   using T = Term;
   static constexpr auto value =
-      array(glz::raw_string<&T::expression>, glz::raw_string<&T::reading>, glz::raw_string<&T::definition_tags>,
+      array(glz::raw_string<&T::expression>, glz::raw_string<&T::reading>, &T::definition_tags,
             glz::raw_string<&T::rules>, &T::score, &T::glossary, &T::sequence, glz::raw_string<&T::term_tags>);
 };
 
