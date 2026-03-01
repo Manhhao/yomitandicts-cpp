@@ -289,12 +289,12 @@ ProcessedFile process_meta_bank(const std::string& content) {
 }
 
 void write_terms(std::ofstream& file, std::unordered_map<std::string, std::vector<uint64_t>>& offsets, zip_t* archive,
-                 const std::vector<int>& files, uint64_t& write_offset, ImportResult& result) {
+                 const std::vector<int>& files, uint64_t& write_offset, ImportResult& result, bool low_ram) {
   if (files.empty()) {
     return;
   }
 
-  size_t max_threads = std::max<size_t>(2, static_cast<const unsigned long>(std::thread::hardware_concurrency() * 2));
+  size_t max_threads = low_ram ? 2 : std::max<size_t>(2, static_cast<const unsigned long>(std::thread::hardware_concurrency() * 2));
   std::deque<std::future<ProcessedFile>> threads;
   auto write_processed = [&](ProcessedFile&& processed) {
     if (processed.data.empty()) {
@@ -324,12 +324,12 @@ void write_terms(std::ofstream& file, std::unordered_map<std::string, std::vecto
 }
 
 void write_meta(std::ofstream& file, std::unordered_map<std::string, std::vector<uint64_t>>& offsets, zip_t* archive,
-                const std::vector<int>& files, uint64_t& write_offset, ImportResult& result) {
+                const std::vector<int>& files, uint64_t& write_offset, ImportResult& result, bool low_ram) {
   if (files.empty()) {
     return;
   }
 
-  size_t max_threads = std::max<size_t>(2, static_cast<const unsigned long>(std::thread::hardware_concurrency() * 2));
+  size_t max_threads = low_ram ? 2 : std::max<size_t>(2, static_cast<const unsigned long>(std::thread::hardware_concurrency() * 2));
   std::deque<std::future<ProcessedFile>> threads;
   auto write_processed = [&](ProcessedFile&& processed) {
     if (processed.data.empty()) {
@@ -409,7 +409,7 @@ void write_media(const std::string& path, zip_t* archive, const std::vector<int>
 }
 }
 
-ImportResult dictionary_importer::import(const std::string& zip_path, const std::string& output_dir) {
+ImportResult dictionary_importer::import(const std::string& zip_path, const std::string& output_dir, bool low_ram) {
   ImportResult result;
   zip_t* archive = nullptr;
   try {
@@ -450,8 +450,8 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
     setup_stream_exceptions(blobs);
     std::unordered_map<std::string, std::vector<uint64_t>> offsets;
     uint64_t write_offset = 0;
-    write_terms(blobs, offsets, archive, files.term_banks, write_offset, result);
-    write_meta(blobs, offsets, archive, files.meta_banks, write_offset, result);
+    write_terms(blobs, offsets, archive, files.term_banks, write_offset, result, low_ram);
+    write_meta(blobs, offsets, archive, files.meta_banks, write_offset, result, low_ram);
     if (offsets.empty()) {
       throw std::runtime_error("empty dictionary");
     }
