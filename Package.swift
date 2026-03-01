@@ -8,7 +8,7 @@ let package = Package(
         .library(name: "CYomitanDicts", targets: ["CYomitanDicts"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/facebook/zstd.git", from: "1.5.0"),
+        .package(path: "external/zstd"),
     ],
     targets: [
         .target(

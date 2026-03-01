@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.22.1)
+cmake_policy(SET CMP0077 NEW)
 
 project(yomitan-dict-import LANGUAGES CXX)
 
@@ -6,11 +7,15 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(zstd REQUIRED)
+set(ZSTD_BUILD_PROGRAMS OFF CACHE BOOL "")
+set(ZSTD_BUILD_TESTS OFF CACHE BOOL "")
+set(ZSTD_BUILD_SHARED OFF CACHE BOOL "")
+set(ZSTD_BUILD_STATIC ON CACHE BOOL "")
 
 add_subdirectory(external/zip)
 add_subdirectory(external/glaze)
 add_subdirectory(external/pthash)
+add_subdirectory(external/zstd)
 
 target_compile_definitions(zip PRIVATE MINIZ_DISABLE_ZIP_READER_CRC32_CHECKS)
 
@@ -33,7 +38,7 @@ target_link_libraries(yomitandicts PRIVATE
     PTHASH
     zip
     glaze::glaze
-    zstd::libzstd_static
+    libzstd_static
 )
 
 add_executable(yomitandicts-cpp

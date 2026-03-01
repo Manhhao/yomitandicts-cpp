@@ -10,3 +10,6 @@
 [submodule "external/pthash"]
 	path = external/pthash
 	url = https://github.com/jermp/pthash.git
+[submodule "external/zstd"]
+	path = external/zstd
+	url = https://github.com/facebook/zstd.git
