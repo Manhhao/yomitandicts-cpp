@@ -21,7 +21,7 @@ class Lookup {
                                    size_t scan_length = 16) const;
 
  private:
-  static std::vector<TermResult> filter_by_pos(const std::vector<TermResult>& terms, const DeinflectionResult& d);
+  static void filter_by_pos(std::vector<TermResult>& terms, const DeinflectionResult& d);
 
   DictionaryQuery& query_;
   Deinflector& deinflector_;

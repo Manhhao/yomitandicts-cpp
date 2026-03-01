@@ -1,30 +1,46 @@
 #include "yomitandicts/importer.hpp"
 
-#include <sqlite3.h>
 #include <zip.h>
 #include <zstd.h>
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <deque>
 #include <filesystem>
+#include <fstream>
 #include <future>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
+#include "hash/hash.hpp"
 #include "json/yomitan_parser.hpp"
 
 namespace {
-struct MediaFile {
-  std::string path;
-  std::vector<uint8_t> blob;
-};
-
-struct ImportFiles {
+struct Files {
   std::vector<int> term_banks;
   std::vector<int> meta_banks;
   std::vector<int> tag_banks;
   std::vector<int> media_files;
 };
+
+struct ProcessedFile {
+  std::vector<char> data;
+  std::unordered_map<std::string, std::vector<uint64_t>> offsets;
+  size_t count = 0;
+};
+
+struct MediaFile {
+  std::string path;
+  std::vector<char> blob;
+};
+
+void setup_stream_exceptions(std::ofstream& stream) { stream.exceptions(std::ios::failbit | std::ios::badbit); }
 
 std::string read_file_by_index(zip_t* archive, int index) {
   if (zip_entry_openbyindex(archive, index) != 0) {
@@ -93,8 +109,8 @@ std::optional<MediaFile> read_media_by_index(zip_t* archive, int index) {
   return out;
 }
 
-ImportFiles get_files(zip_t* archive) {
-  ImportFiles files;
+Files get_files(zip_t* archive) {
+  Files files;
   const ssize_t num_entries = zip_entries_total(archive);
   if (num_entries < 0) {
     return files;
@@ -129,217 +145,273 @@ ImportFiles get_files(zip_t* archive) {
   return files;
 }
 
-void compress_glossary(const char* src, size_t size, std::vector<char>& compressed, ZSTD_CCtx* cctx) {
+void write_u8(std::vector<char>& out, uint8_t value) { out.push_back(static_cast<char>(value)); }
+
+void write_u16(std::vector<char>& out, uint16_t value) {
+  const size_t old_size = out.size();
+  out.resize(old_size + sizeof(uint16_t));
+  std::memcpy(out.data() + old_size, &value, sizeof(uint16_t));
+}
+
+void write_u32(std::vector<char>& out, uint32_t value) {
+  const size_t old_size = out.size();
+  out.resize(old_size + sizeof(uint32_t));
+  std::memcpy(out.data() + old_size, &value, sizeof(uint32_t));
+}
+
+void write_u64(std::vector<char>& out, uint64_t value) {
+  const size_t old_size = out.size();
+  out.resize(old_size + sizeof(uint64_t));
+  std::memcpy(out.data() + old_size, &value, sizeof(uint64_t));
+}
+
+void write_str(std::vector<char>& out, std::string_view value) {
+  if (value.empty()) {
+    return;
+  }
+  const size_t old_size = out.size();
+  out.resize(old_size + value.size());
+  std::memcpy(out.data() + old_size, value.data(), value.size());
+}
+
+void write_bytes(std::vector<char>& out, const void* data, size_t n) {
+  const size_t old_size = out.size();
+  out.resize(old_size + n);
+  std::memcpy(out.data() + old_size, data, n);
+}
+
+void merge_offsets(std::unordered_map<std::string, std::vector<uint64_t>>& a,
+                   std::unordered_map<std::string, std::vector<uint64_t>>& b, uint64_t write_offset) {
+  for (auto& [key, b_offsets] : b) {
+    for (auto& offset : b_offsets) {
+      offset += write_offset;
+    }
+
+    auto it = a.find(key);
+    if (it == a.end()) {
+      a.emplace(key, std::move(b_offsets));
+    } else {
+      auto& values = it->second;
+      values.insert(values.end(), b_offsets.begin(), b_offsets.end());
+    }
+  }
+}
+
+ProcessedFile process_term_bank(const std::string& content) {
+  ProcessedFile processed;
+  if (content.empty()) {
+    return processed;
+  }
+
+  std::vector<Term> out;
+  if (!yomitan_parser::parse_term_bank(content, out)) {
+    return processed;
+  }
+
+  std::vector<char> compressed;
+  ZSTD_CCtx* cctx = ZSTD_createCCtx();
   if (!cctx) {
-    return;
+    return processed;
   }
 
-  size_t bound = ZSTD_compressBound(size);
-  compressed.resize(bound);
-  size_t compressed_size = ZSTD_compressCCtx(cctx, compressed.data(), bound, src, size, 1);
-  if (ZSTD_isError(compressed_size)) {
-    return;
+  for (auto& term : out) {
+    const std::string_view glossary = term.glossary.str;
+    const size_t bound = ZSTD_compressBound(glossary.size());
+    compressed.resize(bound);
+    const size_t compressed_size =
+        ZSTD_compressCCtx(cctx, compressed.data(), bound, glossary.data(), glossary.size(), 0);
+    if (ZSTD_isError(compressed_size)) {
+      ZSTD_freeCCtx(cctx);
+      throw std::runtime_error("failed to compress glossary");
+    }
+
+    uint64_t offset = processed.data.size();
+    std::string_view expr = term.expression;
+    std::string_view reading = term.reading.empty() ? expr : term.reading;
+    std::string_view blob{compressed.data(), compressed_size};
+    std::string_view definition_tags = term.definition_tags.value_or("");
+
+    write_u8(processed.data, 0);
+    write_u16(processed.data, expr.size());
+    write_str(processed.data, expr);
+    write_u16(processed.data, reading.size());
+    write_str(processed.data, reading);
+    write_u32(processed.data, blob.size());
+    write_str(processed.data, blob);
+    write_u8(processed.data, definition_tags.size());
+    write_str(processed.data, definition_tags);
+    write_u8(processed.data, term.rules.size());
+    write_str(processed.data, term.rules);
+    write_u8(processed.data, term.term_tags.size());
+    write_str(processed.data, term.term_tags);
+
+    processed.offsets[std::string(expr)].push_back(offset);
+    if (reading != expr) {
+      processed.offsets[std::string(reading)].push_back(offset);
+    }
+    processed.count++;
   }
-  compressed.resize(compressed_size);
+  ZSTD_freeCCtx(cctx);
+
+  return processed;
 }
 
-void init_db(sqlite3* db) {
-  sqlite3_exec(db,
-               "PRAGMA journal_mode=OFF;"
-               "PRAGMA synchronous=OFF;"
-               "PRAGMA temp_store=MEMORY;"
-               "PRAGMA cache_size=-100000;"
-               "PRAGMA page_size=32768;",
-               nullptr, nullptr, nullptr);
-
-  sqlite3_exec(db, R"(
-            CREATE TABLE info (title TEXT, revision TEXT, format INTEGER, styles TEXT);
-            CREATE TABLE terms (expression TEXT, reading TEXT, definition_tags TEXT, rules TEXT, score INTEGER, glossary BLOB, sequence INTEGER, term_tags TEXT);
-            CREATE TABLE term_meta (expression TEXT, mode TEXT, data TEXT);
-            CREATE TABLE tags (name TEXT, category TEXT, sort_order INTEGER, notes TEXT, score INTEGER);
-            CREATE TABLE media (path TEXT PRIMARY KEY, data BLOB);
-        )",
-               nullptr, nullptr, nullptr);
-}
-
-void store_index(sqlite3* db, const Index& index, const std::string& styles) {
-  sqlite3_stmt* stmt;
-  sqlite3_prepare_v2(db, "INSERT INTO info VALUES (?, ?, ?, ?)", -1, &stmt, nullptr);
-  sqlite3_bind_text(stmt, 1, index.title.data(), static_cast<int>(index.title.size()), SQLITE_STATIC);
-  sqlite3_bind_text(stmt, 2, index.revision.data(), static_cast<int>(index.revision.size()), SQLITE_STATIC);
-  sqlite3_bind_int(stmt, 3, index.format);
-  if (!styles.empty()) {
-    sqlite3_bind_text(stmt, 4, styles.c_str(), -1, SQLITE_STATIC);
-  } else {
-    sqlite3_bind_null(stmt, 4);
+ProcessedFile process_meta_bank(const std::string& content) {
+  ProcessedFile processed;
+  if (content.empty()) {
+    return processed;
   }
-  sqlite3_step(stmt);
-  sqlite3_finalize(stmt);
+
+  std::vector<Meta> out;
+  if (!yomitan_parser::parse_meta_bank(content, out)) {
+    return processed;
+  }
+
+  for (auto& meta : out) {
+    uint64_t offset = processed.data.size();
+    std::string_view expr = meta.expression;
+    std::string_view mode = meta.mode;
+    std::string_view data = meta.data.str;
+
+    write_u8(processed.data, 1);
+    write_u16(processed.data, expr.size());
+    write_str(processed.data, expr);
+    write_u8(processed.data, mode.size());
+    write_str(processed.data, mode);
+    write_u32(processed.data, data.size());
+    write_str(processed.data, data);
+
+    processed.offsets[std::string(expr)].push_back(offset);
+    processed.count++;
+  }
+
+  return processed;
 }
 
-void store_terms(sqlite3* db, zip_t* archive, const std::vector<int>& files, ImportResult& result) {
+void write_terms(std::ofstream& file, std::unordered_map<std::string, std::vector<uint64_t>>& offsets, zip_t* archive,
+                 const std::vector<int>& files, uint64_t& write_offset, ImportResult& result) {
   if (files.empty()) {
     return;
   }
 
-  sqlite3_stmt* stmt;
-  sqlite3_prepare_v2(db, "INSERT INTO terms VALUES (?, ?, ?, ?, ?, ?, ?, ?)", -1, &stmt, nullptr);
-
-  const size_t num_threads = std::max(1U, std::thread::hardware_concurrency() - 1);
-  for (int index : files) {
-    std::string content = read_file_by_index(archive, index);
-    if (content.empty()) {
-      continue;
+  size_t max_threads = std::max<size_t>(2, static_cast<const unsigned long>(std::thread::hardware_concurrency() * 2));
+  std::deque<std::future<ProcessedFile>> threads;
+  auto write_processed = [&](ProcessedFile&& processed) {
+    if (processed.data.empty()) {
+      return;
     }
+    file.write(processed.data.data(), static_cast<std::streamsize>(processed.data.size()));
+    merge_offsets(offsets, processed.offsets, write_offset);
+    write_offset += processed.data.size();
+    result.term_count += processed.count;
+  };
 
-    std::vector<Term> out;
-    if (!yomitan_parser::parse_term_bank(content, out)) {
-      continue;
-    }
+  for (int file_index : files) {
+    std::string content = read_file_by_index(archive, file_index);
+    threads.push_back(
+        std::async(std::launch::async, [content = std::move(content)]() { return process_term_bank(content); }));
 
-    std::vector<std::vector<char>> glossaries(out.size());
-    std::vector<std::future<void>> futures;
-    size_t chunk_size = std::max<size_t>(1, out.size() / num_threads);
-    for (size_t i = 0; i < num_threads; i++) {
-      size_t start = i * chunk_size;
-      size_t end = (i == num_threads - 1) ? out.size() : std::min(out.size(), start + chunk_size);
-      if (start >= out.size()) {
-        break;
-      }
-      futures.push_back(std::async(std::launch::async, [&glossaries, &out, start, end] {
-        ZSTD_CCtx* cctx = ZSTD_createCCtx();
-        for (size_t t = start; t < end; t++) {
-          compress_glossary(out[t].glossary.str.data(), out[t].glossary.str.size(), glossaries[t], cctx);
-        }
-        ZSTD_freeCCtx(cctx);
-      }));
-    }
-    for (const auto& f : futures) {
-      f.wait();
-    }
-
-    for (size_t i = 0; i < out.size(); ++i) {
-      const auto& term = out[i];
-      std::string_view definition_tags = term.definition_tags.value_or("");
-      sqlite3_bind_text(stmt, 1, term.expression.data(), static_cast<int>(term.expression.size()), SQLITE_STATIC);
-      if (term.reading.empty()) {
-        sqlite3_bind_text(stmt, 2, term.expression.data(), static_cast<int>(term.expression.size()), SQLITE_STATIC);
-      } else {
-        sqlite3_bind_text(stmt, 2, term.reading.data(), static_cast<int>(term.reading.size()), SQLITE_STATIC);
-      }
-      sqlite3_bind_text(stmt, 3, definition_tags.data(), static_cast<int>(definition_tags.size()),
-                        SQLITE_STATIC);
-      sqlite3_bind_text(stmt, 4, term.rules.data(), static_cast<int>(term.rules.size()), SQLITE_STATIC);
-      sqlite3_bind_int(stmt, 5, term.score);
-
-      sqlite3_bind_blob(stmt, 6, glossaries[i].data(), static_cast<int>(glossaries[i].size()), SQLITE_STATIC);
-
-      sqlite3_bind_int64(stmt, 7, term.sequence);
-      sqlite3_bind_text(stmt, 8, term.term_tags.data(), static_cast<int>(term.term_tags.size()), SQLITE_STATIC);
-
-      sqlite3_step(stmt);
-      sqlite3_reset(stmt);
-      result.term_count++;
+    if (threads.size() == max_threads) {
+      write_processed(threads.front().get());
+      threads.pop_front();
     }
   }
-  sqlite3_finalize(stmt);
+
+  while (!threads.empty()) {
+    write_processed(threads.front().get());
+    threads.pop_front();
+  }
 }
 
-void store_meta(sqlite3* db, zip_t* archive, const std::vector<int>& files, ImportResult& result) {
+void write_meta(std::ofstream& file, std::unordered_map<std::string, std::vector<uint64_t>>& offsets, zip_t* archive,
+                const std::vector<int>& files, uint64_t& write_offset, ImportResult& result) {
   if (files.empty()) {
     return;
   }
 
-  sqlite3_stmt* stmt;
-  sqlite3_prepare_v2(db, "INSERT INTO term_meta VALUES (?, ?, ?)", -1, &stmt, nullptr);
-
-  for (int index : files) {
-    std::string content = read_file_by_index(archive, index);
-    if (content.empty()) {
-      continue;
+  size_t max_threads = std::max<size_t>(2, static_cast<const unsigned long>(std::thread::hardware_concurrency() * 2));
+  std::deque<std::future<ProcessedFile>> threads;
+  auto write_processed = [&](ProcessedFile&& processed) {
+    if (processed.data.empty()) {
+      return;
     }
+    file.write(processed.data.data(), static_cast<std::streamsize>(processed.data.size()));
+    merge_offsets(offsets, processed.offsets, write_offset);
+    write_offset += processed.data.size();
+    result.meta_count += processed.count;
+  };
 
-    std::vector<Meta> out;
-    if (!yomitan_parser::parse_meta_bank(content, out)) {
-      continue;
-    }
+  for (int file_index : files) {
+    std::string content = read_file_by_index(archive, file_index);
+    threads.push_back(
+        std::async(std::launch::async, [content = std::move(content)]() { return process_meta_bank(content); }));
 
-    for (const auto& meta : out) {
-      sqlite3_bind_text(stmt, 1, meta.expression.data(), static_cast<int>(meta.expression.size()), SQLITE_STATIC);
-      sqlite3_bind_text(stmt, 2, meta.mode.data(), static_cast<int>(meta.mode.size()), SQLITE_STATIC);
-      sqlite3_bind_text(stmt, 3, meta.data.str.data(), static_cast<int>(meta.data.str.size()), SQLITE_STATIC);
-
-      sqlite3_step(stmt);
-      sqlite3_reset(stmt);
-      result.meta_count++;
+    if (threads.size() == max_threads) {
+      write_processed(threads.front().get());
+      threads.pop_front();
     }
   }
-  sqlite3_finalize(stmt);
+
+  while (!threads.empty()) {
+    write_processed(threads.front().get());
+    threads.pop_front();
+  }
 }
 
-void store_tags(sqlite3* db, zip_t* archive, const std::vector<int>& files, ImportResult& result) {
+void write_offset_index(std::ostream& file, std::unordered_map<std::string, std::vector<uint64_t>>& offsets,
+                        uint64_t& write_offset, std::vector<std::string_view>& keys,
+                        std::vector<uint64_t>& key_offsets) {
+  std::vector<char> offset_buf;
+  for (auto& [key, offs] : offsets) {
+    keys.push_back(key);
+    key_offsets.push_back(write_offset);
+
+    write_u32(offset_buf, offs.size());
+    write_bytes(offset_buf, offs.data(), offs.size() * sizeof(uint64_t));
+
+    write_offset += sizeof(uint32_t) + offs.size() * sizeof(uint64_t);
+  }
+  file.write(offset_buf.data(), static_cast<std::streamsize>(offset_buf.size()));
+}
+
+void write_media(const std::string& path, zip_t* archive, const std::vector<int>& files, ImportResult& result) {
   if (files.empty()) {
     return;
   }
 
-  sqlite3_stmt* stmt;
-  sqlite3_prepare_v2(db, "INSERT INTO tags VALUES (?, ?, ?, ?, ?)", -1, &stmt, nullptr);
+  std::ofstream blobs(path + "/media.bin", std::ios::binary);
+  std::ofstream index(path + "/media_index.bin", std::ios::binary);
+  setup_stream_exceptions(blobs);
+  setup_stream_exceptions(index);
 
-  for (int index : files) {
-    std::string content = read_file_by_index(archive, index);
-    if (content.empty()) {
-      continue;
-    }
-
-    std::vector<Tag> out;
-    if (!yomitan_parser::parse_tag_bank(content, out)) {
-      continue;
-    }
-
-    for (const auto& tag : out) {
-      sqlite3_bind_text(stmt, 1, tag.name.data(), static_cast<int>(tag.name.size()), SQLITE_STATIC);
-      sqlite3_bind_text(stmt, 2, tag.category.data(), static_cast<int>(tag.category.size()), SQLITE_STATIC);
-      sqlite3_bind_int(stmt, 3, tag.order);
-      sqlite3_bind_text(stmt, 4, tag.notes.data(), static_cast<int>(tag.notes.size()), SQLITE_STATIC);
-      sqlite3_bind_int(stmt, 5, tag.score);
-
-      sqlite3_step(stmt);
-      sqlite3_reset(stmt);
-      result.tag_count++;
-    }
-  }
-  sqlite3_finalize(stmt);
-}
-
-void store_media(sqlite3* db, zip_t* archive, const std::vector<int>& files, ImportResult& result) {
-  if (files.empty()) {
-    return;
-  }
-
-  sqlite3_stmt* stmt;
-  sqlite3_prepare_v2(db, "INSERT INTO media VALUES (?, ?)", -1, &stmt, nullptr);
-
-  for (int index : files) {
-    auto media = read_media_by_index(archive, index);
+  uint64_t write_offset = 0;
+  std::vector<char> blobs_buf;
+  std::vector<char> index_buf;
+  for (int file_index : files) {
+    auto media = read_media_by_index(archive, file_index);
     if (!media.has_value()) {
       continue;
     }
 
-    sqlite3_bind_text(stmt, 1, media->path.data(), static_cast<int>(media->path.size()), SQLITE_STATIC);
-    sqlite3_bind_blob(stmt, 2, media->blob.data(), static_cast<int>(media->blob.size()), SQLITE_STATIC);
+    const auto blob_size = media->blob.size();
+    write_bytes(blobs_buf, media->blob.data(), blob_size);
 
-    sqlite3_step(stmt);
-    sqlite3_reset(stmt);
+    write_u16(index_buf, media->path.size());
+    write_str(index_buf, media->path);
+    write_u64(index_buf, write_offset);
+    write_u32(index_buf, blob_size);
+
+    write_offset += blob_size;
     result.media_count++;
   }
-  sqlite3_finalize(stmt);
+  blobs.write(blobs_buf.data(), static_cast<std::streamsize>(blobs_buf.size()));
+  index.write(index_buf.data(), static_cast<std::streamsize>(index_buf.size()));
 }
 }
 
 ImportResult dictionary_importer::import(const std::string& zip_path, const std::string& output_dir) {
   ImportResult result;
   zip_t* archive = nullptr;
-  sqlite3* db = nullptr;
   try {
     archive = zip_open(zip_path.c_str(), 0, 'r');
     if (!archive) {
@@ -358,38 +430,53 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
 
     result.title = index.title;
 
-    std::filesystem::create_directories(output_dir);
-    std::filesystem::path db_path = std::filesystem::path(output_dir) / (result.title + ".db");
-    std::string path = db_path.string();
+    std::filesystem::path dict_path = std::filesystem::path(output_dir) / result.title;
+    std::string path = dict_path.string();
+    std::filesystem::create_directories(dict_path);
 
-    if (std::filesystem::exists(path)) {
-      std::filesystem::remove(path);
+    if (glz::write_file_json(index, path + "/info.json", std::string{})) {
+      throw std::runtime_error("failed to write info.json");
     }
-
-    if (sqlite3_open(path.c_str(), &db) != SQLITE_OK) {
-      throw std::runtime_error("error opening db");
-    }
-
-    init_db(db);
 
     std::string styles = read_file_by_name(archive, "styles.css");
+    if (!styles.empty()) {
+      std::ofstream styles_file(path + "/styles.css", std::ios::binary);
+      setup_stream_exceptions(styles_file);
+      styles_file.write(styles.data(), static_cast<std::streamsize>(styles.size()));
+    }
 
-    store_index(db, index, styles);
+    const Files files = get_files(archive);
+    std::ofstream blobs(path + "/blobs.bin", std::ios::binary);
+    setup_stream_exceptions(blobs);
+    std::unordered_map<std::string, std::vector<uint64_t>> offsets;
+    uint64_t write_offset = 0;
+    write_terms(blobs, offsets, archive, files.term_banks, write_offset, result);
+    write_meta(blobs, offsets, archive, files.meta_banks, write_offset, result);
+    if (offsets.empty()) {
+      throw std::runtime_error("empty dictionary");
+    }
 
-    const ImportFiles files = get_files(archive);
-    sqlite3_exec(db, "BEGIN", nullptr, nullptr, nullptr);
-    store_terms(db, archive, files.term_banks, result);
-    store_meta(db, archive, files.meta_banks, result);
-    store_tags(db, archive, files.tag_banks, result);
-    store_media(db, archive, files.media_files, result);
-    sqlite3_exec(db, "COMMIT", nullptr, nullptr, nullptr);
+    std::vector<std::string_view> keys;
+    std::vector<uint64_t> key_offsets;
+    write_offset_index(blobs, offsets, write_offset, keys, key_offsets);
+
+    hash::mphf phf;
+    phf.build(keys);
+    phf.save(path + "/hash.mph");
+
+    std::vector<uint64_t> offset_hash_table(keys.size());
+    for (size_t i = 0; i < keys.size(); i++) {
+      auto& key = keys[i];
+      offset_hash_table[phf(key)] = key_offsets[i];
+    }
+    std::ofstream offs(path + "/offsets.bin", std::ios::binary);
+    setup_stream_exceptions(offs);
+    offs.write(reinterpret_cast<const char*>(offset_hash_table.data()),
+               static_cast<std::streamsize>(offset_hash_table.size() * sizeof(uint64_t)));
+
+    write_media(path, archive, files.media_files, result);
+
     result.success = true;
-
-    sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_terms_expression ON terms(expression);", nullptr, nullptr,
-                 nullptr);
-    sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_terms_reading ON terms(reading);", nullptr, nullptr, nullptr);
-    sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS idx_meta_expression_mode ON term_meta(expression, mode);", nullptr,
-                 nullptr, nullptr);
   } catch (const std::exception& e) {
     result.success = false;
     result.errors.emplace_back(e.what());
@@ -399,8 +486,8 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
     zip_close(archive);
   }
 
-  if (db) {
-    sqlite3_close(db);
+  if (!result.success && !result.title.empty()) {
+    std::filesystem::remove_all(std::filesystem::path(output_dir) / result.title);
   }
 
   return result;

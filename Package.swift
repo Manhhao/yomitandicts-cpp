@@ -37,13 +37,15 @@ let package = Package(
                 .headerSearchPath("external/zip/src"),
                 .headerSearchPath("external/utfcpp/source"),
                 .headerSearchPath("external/glaze/include"),
+                .headerSearchPath("external/pthash/include"),
+                .headerSearchPath("external/pthash/external/bits/include"),
+                .headerSearchPath("external/pthash/external/bits/external/essentials/include"),
+                .headerSearchPath("external/pthash/external/mm_file/include"),
+                .headerSearchPath("external/pthash/external/xxHash"),
                 .unsafeFlags(["-Wno-missing-braces"]),
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx)
-            ],
-            linkerSettings: [
-                .linkedLibrary("sqlite3")
             ]
         ),
     ],

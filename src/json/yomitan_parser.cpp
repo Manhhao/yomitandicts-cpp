@@ -6,9 +6,10 @@
 template <>
 struct glz::meta<Index> {
   using T = Index;
-  static constexpr auto value = object("title", glz::raw_string<&T::title>, "revision", glz::raw_string<&T::revision>,
-                                       "format", &T::format, "isUpdatable", &T::updatable, "indexUrl",
-                                       glz::raw_string<&T::index_url>, "updateUrl", glz::raw_string<&T::download_url>);
+  static constexpr auto value =
+      object("title", glz::raw_string<&T::title>, "revision", glz::raw_string<&T::revision>, "format", &T::format,
+             "isUpdatable", &T::updatable, "indexUrl", glz::raw_string<&T::index_url>, "downloadUrl",
+             glz::raw_string<&T::download_url>);
 };
 
 template <>

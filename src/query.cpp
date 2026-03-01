@@ -1,168 +1,205 @@
 #include "yomitandicts/query.hpp"
 
-#include <sqlite3.h>
+#include <sys/fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <zstd.h>
 
-#include <filesystem>
-#include <map>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <fstream>
+#include <memory>
 #include <ranges>
+#include <string_view>
 
+#include "hash/hash.hpp"
 #include "json/yomitan_parser.hpp"
 
-DictionaryQuery::~DictionaryQuery() {
-  for (auto& [name, styles, db, stmt] : dicts_) {
-    sqlite3_finalize(stmt);
-    sqlite3_close(db);
+namespace {
+uint8_t read_u8(const uint8_t*& addr) { return *addr++; }
+
+uint16_t read_u16(const uint8_t*& addr) {
+  uint16_t result;
+  std::memcpy(&result, addr, sizeof(uint16_t));
+  addr += sizeof(uint16_t);
+  return result;
+}
+
+uint32_t read_u32(const uint8_t*& addr) {
+  uint32_t result;
+  std::memcpy(&result, addr, sizeof(uint32_t));
+  addr += sizeof(uint32_t);
+  return result;
+}
+
+uint64_t read_u64(const uint8_t*& addr) {
+  uint64_t result;
+  std::memcpy(&result, addr, sizeof(uint64_t));
+  addr += sizeof(uint64_t);
+  return result;
+}
+
+std::string_view read_str(const uint8_t*& addr, uint32_t len) {
+  std::string_view result(reinterpret_cast<const char*>(addr), len);
+  addr += len;
+  return result;
+}
+}
+
+struct DictionaryQuery::DictionaryData {
+  hash::mphf phf;
+  uint8_t* blobs = nullptr;
+  size_t blobs_size = 0;
+  uint64_t* offsets = nullptr;
+  size_t offsets_size = 0;
+
+  ~DictionaryData() {
+    if (blobs) {
+      munmap(blobs, blobs_size);
+    }
+    if (offsets) {
+      munmap(offsets, offsets_size);
+    }
   }
-  for (auto& [name, styles, db, stmt] : freq_dicts_) {
-    sqlite3_finalize(stmt);
-    sqlite3_close(db);
+};
+
+DictionaryQuery::DictionaryQuery() = default;
+DictionaryQuery::~DictionaryQuery() = default;
+
+DictionaryQuery::DictionaryQuery(DictionaryQuery&&) noexcept = default;
+DictionaryQuery& DictionaryQuery::operator=(DictionaryQuery&&) noexcept = default;
+
+void DictionaryQuery::add_dict(const std::string& path, DictionaryType type) {
+  Dictionary dict;
+  Index info;
+  std::string buf{};
+  if (glz::read_file_json(info, path + "/info.json", buf)) {
+    return;
   }
-  for (auto& [name, styles, db, stmt] : pitch_dicts_) {
-    sqlite3_finalize(stmt);
-    sqlite3_close(db);
+
+  dict.name = info.title.empty() ? std::filesystem::path(path).stem().string() : info.title;
+  if (std::filesystem::exists(path + "/styles.css")) {
+    std::ifstream f(path + "/styles.css");
+    dict.styles = std::string(std::istreambuf_iterator<char>(f), {});
+  }
+
+  dict.data = std::make_unique<DictionaryData>();
+  dict.data->phf.load(path + "/hash.mph");
+
+  struct stat st{};
+  int fd = open((path + "/offsets.bin").c_str(), O_RDONLY);
+  if (fd == -1) {
+    return;
+  }
+
+  if (fstat(fd, &st) != 0) {
+    close(fd);
+    return;
+  }
+
+  dict.data->offsets_size = st.st_size;
+  dict.data->offsets = reinterpret_cast<uint64_t*>(mmap(nullptr, st.st_size, PROT_READ, MAP_SHARED, fd, 0));
+  if (dict.data->offsets == MAP_FAILED) {
+    close(fd);
+    return;
+  }
+  close(fd);
+
+  fd = open((path + "/blobs.bin").c_str(), O_RDONLY);
+  if (fd < 0) {
+    return;
+  }
+
+  if (fstat(fd, &st) != 0) {
+    close(fd);
+    return;
+  }
+
+  dict.data->blobs_size = st.st_size;
+  dict.data->blobs = reinterpret_cast<uint8_t*>(mmap(nullptr, st.st_size, PROT_READ, MAP_SHARED, fd, 0));
+  if (dict.data->blobs == MAP_FAILED) {
+    close(fd);
+    return;
+  }
+  close(fd);
+
+  switch (type) {
+    case TERM:
+      dicts_.push_back(std::move(dict));
+      break;
+    case FREQ:
+      freq_dicts_.push_back(std::move(dict));
+      break;
+    case PITCH:
+      pitch_dicts_.push_back(std::move(dict));
+      break;
   }
 }
 
-void DictionaryQuery::add_dict(const std::string& db_path) {
-  sqlite3* db;
-  if (sqlite3_open_v2(db_path.c_str(), &db, SQLITE_OPEN_READONLY, nullptr) != SQLITE_OK) {
-    return;
-  }
+void DictionaryQuery::add_term_dict(const std::string& path) { add_dict(path, DictionaryQuery::DictionaryType::TERM); }
 
-  std::string name;
-  std::string styles;
-  sqlite3_stmt* info_stmt;
-  if (sqlite3_prepare_v2(db, "SELECT title, styles FROM info LIMIT 1", -1, &info_stmt, nullptr) == SQLITE_OK) {
-    if (sqlite3_step(info_stmt) == SQLITE_ROW) {
-      const char* title_text = reinterpret_cast<const char*>(sqlite3_column_text(info_stmt, 0));
-      const char* style_text = reinterpret_cast<const char*>(sqlite3_column_text(info_stmt, 1));
+void DictionaryQuery::add_freq_dict(const std::string& path) { add_dict(path, DictionaryQuery::DictionaryType::FREQ); }
 
-      if (title_text) {
-        name = title_text;
-      }
-      if (style_text) {
-        styles = style_text;
-      }
-    }
-  }
-  sqlite3_finalize(info_stmt);
-
-  if (name.empty()) {
-    name = std::filesystem::path(db_path).stem().string();
-  }
-
-  sqlite3_stmt* stmt;
-  if (sqlite3_prepare_v2(db,
-                         "SELECT expression, reading, definition_tags, rules, glossary, term_tags "
-                         "FROM terms WHERE expression = ? OR reading = ?",
-                         -1, &stmt, nullptr) != SQLITE_OK) {
-    sqlite3_close(db);
-    return;
-  }
-  dicts_.emplace_back(std::move(name), std::move(styles), db, stmt);
-}
-
-void DictionaryQuery::add_freq_dict(const std::string& db_path) {
-  sqlite3* db;
-  if (sqlite3_open_v2(db_path.c_str(), &db, SQLITE_OPEN_READONLY, nullptr) != SQLITE_OK) {
-    return;
-  }
-
-  std::string name;
-  sqlite3_stmt* info_stmt;
-  if (sqlite3_prepare_v2(db, "SELECT title FROM info LIMIT 1", -1, &info_stmt, nullptr) == SQLITE_OK) {
-    if (sqlite3_step(info_stmt) == SQLITE_ROW) {
-      const char* title_text = reinterpret_cast<const char*>(sqlite3_column_text(info_stmt, 0));
-
-      if (title_text) {
-        name = title_text;
-      }
-    }
-  }
-  sqlite3_finalize(info_stmt);
-
-  if (name.empty()) {
-    name = std::filesystem::path(db_path).stem().string();
-  }
-
-  sqlite3_stmt* stmt;
-  if (sqlite3_prepare_v2(db, "SELECT data FROM term_meta WHERE expression = ? AND mode = 'freq'", -1, &stmt, nullptr) !=
-      SQLITE_OK) {
-    sqlite3_close(db);
-    return;
-  }
-  freq_dicts_.emplace_back(std::move(name), "", db, stmt);
-}
-
-void DictionaryQuery::add_pitch_dict(const std::string& db_path) {
-  sqlite3* db;
-  if (sqlite3_open_v2(db_path.c_str(), &db, SQLITE_OPEN_READONLY, nullptr) != SQLITE_OK) {
-    return;
-  }
-
-  std::string name;
-  sqlite3_stmt* info_stmt;
-  if (sqlite3_prepare_v2(db, "SELECT title FROM info LIMIT 1", -1, &info_stmt, nullptr) == SQLITE_OK) {
-    if (sqlite3_step(info_stmt) == SQLITE_ROW) {
-      const char* title_text = reinterpret_cast<const char*>(sqlite3_column_text(info_stmt, 0));
-
-      if (title_text) {
-        name = title_text;
-      }
-    }
-  }
-  sqlite3_finalize(info_stmt);
-
-  if (name.empty()) {
-    name = std::filesystem::path(db_path).stem().string();
-  }
-
-  sqlite3_stmt* stmt;
-  if (sqlite3_prepare_v2(db, "SELECT data FROM term_meta WHERE expression = ? AND mode = 'pitch'", -1, &stmt,
-                         nullptr) != SQLITE_OK) {
-    sqlite3_close(db);
-    return;
-  }
-  pitch_dicts_.emplace_back(std::move(name), "", db, stmt);
+void DictionaryQuery::add_pitch_dict(const std::string& path) {
+  add_dict(path, DictionaryQuery::DictionaryType::PITCH);
 }
 
 std::vector<TermResult> DictionaryQuery::query(const std::string& expression) const {
-  std::map<std::pair<std::string, std::string>, TermResult> term_map;
-  for (const auto& [name, styles, db, stmt] : dicts_) {
-    sqlite3_bind_text(stmt, 1, expression.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, expression.c_str(), -1, SQLITE_STATIC);
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
-      std::string expr = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
-      std::string reading = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
-      std::string definition_tags = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
-      std::string rules = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
-      std::string term_tags = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
+  std::map<std::pair<std::string_view, std::string_view>, TermResult> term_map;
+  for (const auto& [name, styles, data] : dicts_) {
+    uint64_t hash = data->phf(expression);
+    uint64_t offset_addr = data->offsets[hash];
+    const uint8_t* index_addr = data->blobs + offset_addr;
+
+    uint32_t count = read_u32(index_addr);
+    for (uint32_t i = 0; i < count; i++) {
+      uint64_t offset = read_u64(index_addr);
+      const uint8_t* blob_addr = data->blobs + offset;
+
+      // first byte encodes term (0) or meta (1) entry
+      uint8_t type = read_u8(blob_addr);
+      if (type != 0) {
+        continue;
+      }
+
+      uint16_t expr_len = read_u16(blob_addr);
+      std::string_view expr = read_str(blob_addr, expr_len);
+
+      uint16_t reading_len = read_u16(blob_addr);
+      std::string_view reading = read_str(blob_addr, reading_len);
+
+      if (expr != expression && reading != expression) {
+        continue;
+      }
+
+      uint32_t glossary_size = read_u32(blob_addr);
+      std::string glossary = decompress_glossary(read_str(blob_addr, glossary_size).data(), glossary_size);
+
+      uint8_t def_tags_size = read_u8(blob_addr);
+      std::string_view definition_tags = read_str(blob_addr, def_tags_size);
+
+      uint8_t rules_size = read_u8(blob_addr);
+      std::string_view rules = read_str(blob_addr, rules_size);
+
+      uint8_t term_tag_size = read_u8(blob_addr);
+      std::string_view term_tags = read_str(blob_addr, term_tag_size);
 
       GlossaryEntry entry;
       entry.dict_name = name;
       entry.definition_tags = definition_tags;
       entry.term_tags = term_tags;
-
-      const void* blob = sqlite3_column_blob(stmt, 4);
-      int blob_size = sqlite3_column_bytes(stmt, 4);
-      entry.glossary = decompress_glossary(blob, blob_size);
+      entry.glossary = glossary;
 
       auto [it, inserted] = term_map.try_emplace({expr, reading});
       if (inserted) {
-        it->second = {.expression = expr,
-                      .reading = reading,
-                      .definition_tags = definition_tags,
-                      .rules = rules,
+        it->second = {.expression = std::string(expr),
+                      .reading = std::string(reading),
+                      .rules = std::string(rules),
                       .glossaries = {},
                       .frequencies = {}};
       } else {
-        if (!definition_tags.empty()) {
-          if (!it->second.definition_tags.empty()) {
-            it->second.definition_tags += " ";
-          }
-          it->second.definition_tags += definition_tags;
-        }
         if (!rules.empty()) {
           if (!it->second.rules.empty()) {
             it->second.rules += " ";
@@ -172,7 +209,6 @@ std::vector<TermResult> DictionaryQuery::query(const std::string& expression) co
       }
       it->second.glossaries.push_back(std::move(entry));
     }
-    sqlite3_reset(stmt);
   }
 
   auto results = term_map | std::views::values | std::views::as_rvalue | std::ranges::to<std::vector>();
@@ -184,14 +220,40 @@ std::vector<TermResult> DictionaryQuery::query(const std::string& expression) co
 
 void DictionaryQuery::query_freq(std::vector<TermResult>& terms) const {
   for (auto& term : terms) {
-    for (const auto& [name, styles, db, stmt] : freq_dicts_) {
-      sqlite3_bind_text(stmt, 1, term.expression.c_str(), -1, SQLITE_STATIC);
+    for (const auto& [name, styles, data] : freq_dicts_) {
+      uint64_t hash = data->phf(term.expression);
+      uint64_t offset_addr = data->offsets[hash];
+
+      const uint8_t* index_addr = data->blobs + offset_addr;
+      uint32_t count = read_u32(index_addr);
+
       std::vector<Frequency> frequencies;
-      while (sqlite3_step(stmt) == SQLITE_ROW) {
-        const char* data = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+      for (uint32_t i = 0; i < count; i++) {
+        uint64_t offset = read_u64(index_addr);
+        const uint8_t* blob_addr = data->blobs + offset;
+
+        uint8_t type = read_u8(blob_addr);
+        if (type != 1) {
+          continue;
+        }
+
+        uint16_t expr_len = read_u16(blob_addr);
+        std::string_view expr = read_str(blob_addr, expr_len);
+        if (expr != term.expression) {
+          continue;
+        }
+
+        uint8_t mode_len = read_u8(blob_addr);
+        std::string_view mode = read_str(blob_addr, mode_len);
+        if (mode != "freq") {
+          continue;
+        }
+
+        uint32_t freq_data_size = read_u32(blob_addr);
+        std::string_view freq_data = read_str(blob_addr, freq_data_size);
 
         ParsedFrequency parsed;
-        if (yomitan_parser::parse_frequency(data, parsed)) {
+        if (yomitan_parser::parse_frequency(freq_data, parsed)) {
           if (!parsed.reading.empty() && parsed.reading != term.reading) {
             continue;
           }
@@ -199,8 +261,6 @@ void DictionaryQuery::query_freq(std::vector<TermResult>& terms) const {
               Frequency{.value = parsed.value, .display_value = std::string(parsed.display_value)});
         }
       }
-      sqlite3_reset(stmt);
-
       if (!frequencies.empty()) {
         term.frequencies.emplace_back(FrequencyEntry{.dict_name = name, .frequencies = std::move(frequencies)});
       }
@@ -210,22 +270,46 @@ void DictionaryQuery::query_freq(std::vector<TermResult>& terms) const {
 
 void DictionaryQuery::query_pitch(std::vector<TermResult>& terms) const {
   for (auto& term : terms) {
-    for (const auto& [name, styles, db, stmt] : pitch_dicts_) {
-      sqlite3_bind_text(stmt, 1, term.expression.c_str(), -1, SQLITE_STATIC);
+    for (const auto& [name, styles, data] : pitch_dicts_) {
+      uint64_t hash = data->phf(term.expression);
+      uint64_t offset_addr = data->offsets[hash];
+
+      const uint8_t* index_addr = data->blobs + offset_addr;
+      uint32_t count = read_u32(index_addr);
+
       std::vector<int> pitch_positions;
-      while (sqlite3_step(stmt) == SQLITE_ROW) {
-        const char* data = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+      for (uint32_t i = 0; i < count; i++) {
+        uint64_t offset = read_u64(index_addr);
+        const uint8_t* blob_addr = data->blobs + offset;
+
+        uint8_t type = read_u8(blob_addr);
+        if (type != 1) {
+          continue;
+        }
+
+        uint16_t expr_len = read_u16(blob_addr);
+        std::string_view expr = read_str(blob_addr, expr_len);
+        if (expr != term.expression) {
+          continue;
+        }
+
+        uint8_t mode_len = read_u8(blob_addr);
+        std::string_view mode = read_str(blob_addr, mode_len);
+        if (mode != "pitch") {
+          continue;
+        }
+
+        uint32_t pitch_data_size = read_u32(blob_addr);
+        std::string_view pitch_data = read_str(blob_addr, pitch_data_size);
 
         ParsedPitch parsed;
-        if (yomitan_parser::parse_pitch(data, parsed)) {
+        if (yomitan_parser::parse_pitch(pitch_data, parsed)) {
           if (!parsed.reading.empty() && parsed.reading != term.reading) {
             continue;
           }
           pitch_positions.insert(pitch_positions.end(), parsed.pitches.begin(), parsed.pitches.end());
         }
       }
-      sqlite3_reset(stmt);
-
       if (!pitch_positions.empty()) {
         term.pitches.emplace_back(PitchEntry{.dict_name = name, .pitch_positions = std::move(pitch_positions)});
       }
