@@ -4,7 +4,7 @@
 #include <print>
 #include <vector>
 
-#include "yomitandicts/deinflector.hpp"
+#include "yomitandicts/deconjugator.hpp"
 #include "yomitandicts/lookup.hpp"
 #include "yomitandicts/query.hpp"
 
@@ -20,8 +20,8 @@ int main(int argc, char** argv) {
 
   DictionaryQuery query;
   query.add_term_dict(dict_path);
-  Deinflector deinflector;
-  Lookup lookup(query, deinflector);
+  Deconjugator deconjugator;
+  Lookup lookup(query, deconjugator);
 
   std::vector<double> durations;
   for (int i = 0; i < iterations; ++i) {

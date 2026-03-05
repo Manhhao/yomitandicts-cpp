@@ -11,7 +11,7 @@
 #include <string>
 
 #include "../src/text_processor/text_processor.hpp"
-#include "yomitandicts/deinflector.hpp"
+#include "yomitandicts/deconjugator.hpp"
 #include "yomitandicts/importer.hpp"
 #include "yomitandicts/lookup.hpp"
 #include "yomitandicts/query.hpp"
@@ -19,7 +19,7 @@
 void print_usage(const char* program) {
   std::println("Usage:");
   std::println("{} import <path/to/dictionary.zip>", program);
-  std::println("{} deinflect <word>", program);
+  std::println("{} deconjugate <word>", program);
   std::println("{} preprocess <word>", program);
   std::println("{} query <path/to/dictionary> <word>", program);
   std::println("{} lookup <path/to/dictionary> <lookup_string>", program);
@@ -48,19 +48,26 @@ void cmd_import(const std::string& path) {
   }
 }
 
-void cmd_deinflect(const std::string& inflected) {
-  Deinflector deinflector;
-  auto results = deinflector.deinflect(inflected);
+void cmd_deconjugate(const std::string& text) {
+  Deconjugator deconjugator;
+  auto results = deconjugator.deconjugate(text);
 
-  std::println("deinflections for: {} length: {}", inflected, utf8::distance(inflected.begin(), inflected.end()));
+  std::println("deconjugations for: {} length: {}", text, utf8::distance(text.begin(), text.end()));
   std::println("found {} candidates\n", results.size());
 
   for (const auto& r : results) {
-    std::println("{} (conditions: {})", r.text, r.conditions);
-    if (!r.trace.empty()) {
-      std::print("  ");
-      for (size_t i = 0; i < r.trace.size(); ++i) {
-        std::print("{}{}", r.trace[i].name, i < r.trace.size() - 1 ? " -> " : "");
+    std::println("{}", r.text);
+    if (!r.tags.empty()) {
+      std::print("  tags: ");
+      for (size_t i = 0; i < r.tags.size(); ++i) {
+        std::print("{}{}", r.tags[i], i < r.tags.size() - 1 ? ", " : "");
+      }
+      std::println("");
+    }
+    if (!r.process.empty()) {
+      std::print("  process: ");
+      for (size_t i = 0; i < r.process.size(); ++i) {
+        std::print("{}{}", r.process[i], i < r.process.size() - 1 ? " -> " : "");
       }
       std::println("");
     }
@@ -122,8 +129,8 @@ void cmd_lookup(const std::vector<std::string>& db_paths, const std::string& loo
   for (const auto& path : db_paths) {
     dict_query.add_term_dict(path);
   }
-  Deinflector deinflect;
-  Lookup lookup(dict_query, deinflect);
+  Deconjugator deconjugator;
+  Lookup lookup(dict_query, deconjugator);
   auto result = lookup.lookup(lookup_string, max_results, scan_length);
 
   std::println("lookup results for: {} max_results: {} scan_length: {}", lookup_string, max_results, scan_length);
@@ -132,10 +139,10 @@ void cmd_lookup(const std::vector<std::string>& db_paths, const std::string& loo
   for (const auto& r : result) {
     std::println("---------------------------------------------------------------");
     std::println("{}", r.matched);
-    if (!r.trace.empty()) {
+    if (!r.process.empty()) {
       std::print("  ");
-      for (size_t i = 0; i < r.trace.size(); ++i) {
-        std::print("{}{}", r.trace[i].name, i < r.trace.size() - 1 ? " -> " : "");
+      for (size_t i = 0; i < r.process.size(); ++i) {
+        std::print("{}{}", r.process[i], i < r.process.size() - 1 ? " -> " : "");
       }
       std::println("");
     }
@@ -165,8 +172,8 @@ int main(int argc, char* argv[]) {
 
   if (command == "import" && argc >= 3) {
     cmd_import(argv[2]);
-  } else if (command == "deinflect" && argc >= 3) {
-    cmd_deinflect(argv[2]);
+  } else if (command == "deconjugate" && argc >= 3) {
+    cmd_deconjugate(argv[2]);
   } else if (command == "preprocess" && argc >= 3) {
     cmd_preprocess(argv[2]);
   } else if (command == "query" && argc >= 4) {

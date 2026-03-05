@@ -24,7 +24,7 @@ add_library(yomitandicts
     src/importer.cpp
     src/json/yomitan_parser.cpp
     src/text_processor/text_processor.cpp
-    src/deinflector.cpp
+    src/deconjugator/deconjugator.cpp
     src/query.cpp
     src/lookup.cpp
 )
