@@ -6,6 +6,7 @@
 #include <map>
 #include <ranges>
 #include <sstream>
+#include <unordered_map>
 
 #include "text_processor/text_processor.hpp"
 
@@ -64,8 +65,17 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
     auto processor_results = text_processor::process(search_str);
     for (auto& variant : processor_results) {
       auto deconjugation_results = deconjugator_.deconjugate(variant.text);
-      for (auto& form : deconjugation_results) {
-        auto terms = query_.query(form.text);
+      std::unordered_map<std::string, const DeconjugationForm*> deduplicated;
+      for (const auto& form : deconjugation_results) {
+        auto [it, inserted] = deduplicated.try_emplace(form.text, &form);
+        if (!inserted && form.process.size() < it->second->process.size()) {
+          it->second = &form;
+        }
+      }
+
+      for (const auto& [text, form_ptr] : deduplicated) {
+        const auto& form = *form_ptr;
+        auto terms = query_.query(text);
         filter_by_pos(terms, form);
 
         for (const auto& term : terms) {
@@ -140,10 +150,10 @@ void Lookup::filter_by_pos(std::vector<TermResult>& terms, const DeconjugationFo
   // => we give the dict the benefit of the doubt
   // if a dict does define conditions, we execute the normal check
   std::erase_if(terms, [&](const TermResult& term) {
-    if (term.rules.empty()) return false;
+    if (term.rules.empty()) {
+      return false;
+    }
     auto pos_tags = split_whitespace(term.rules);
-    return std::ranges::none_of(pos_tags, [&](const std::string& p) {
-      return p == tag || tag.starts_with(p);
-    });
+    return std::ranges::none_of(pos_tags, [&](const std::string& p) { return p == tag || tag.starts_with(p); });
   });
 }
