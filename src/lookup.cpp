@@ -6,7 +6,6 @@
 #include <map>
 #include <ranges>
 #include <sstream>
-#include <unordered_map>
 
 #include "text_processor/text_processor.hpp"
 
@@ -65,17 +64,18 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
     auto processor_results = text_processor::process(search_str);
     for (auto& variant : processor_results) {
       auto deconjugation_results = deconjugator_.deconjugate(variant.text);
-      std::unordered_map<std::string, const DeconjugationForm*> deduplicated;
+      std::map<std::pair<std::string, std::string>, const DeconjugationForm*> deduplicated;
       for (const auto& form : deconjugation_results) {
-        auto [it, inserted] = deduplicated.try_emplace(form.text, &form);
+        auto [it, inserted] =
+            deduplicated.try_emplace(std::pair{form.text, form.tags.empty() ? std::string{} : form.tags.back()}, &form);
         if (!inserted && form.process.size() < it->second->process.size()) {
           it->second = &form;
         }
       }
 
-      for (const auto& [text, form_ptr] : deduplicated) {
+      for (const auto& [pair, form_ptr] : deduplicated) {
         const auto& form = *form_ptr;
-        auto terms = query_.query(text);
+        auto terms = query_.query(pair.first);
         filter_by_pos(terms, form);
 
         for (const auto& term : terms) {
