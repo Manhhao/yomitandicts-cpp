@@ -1,5 +1,5 @@
-module CYomitanDicts {
-    header "yomitandicts.h"
+module CHoshiDicts {
+    header "hoshidicts.h"
     requires cplusplus
     export *
 }

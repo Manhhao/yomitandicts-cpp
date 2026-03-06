@@ -11,10 +11,10 @@
 #include <string>
 
 #include "../src/text_processor/text_processor.hpp"
-#include "yomitandicts/deconjugator.hpp"
-#include "yomitandicts/importer.hpp"
-#include "yomitandicts/lookup.hpp"
-#include "yomitandicts/query.hpp"
+#include "hoshidicts/deconjugator.hpp"
+#include "hoshidicts/importer.hpp"
+#include "hoshidicts/lookup.hpp"
+#include "hoshidicts/query.hpp"
 
 void print_usage(const char* program) {
   std::println("Usage:");

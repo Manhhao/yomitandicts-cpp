@@ -1,4 +1,5 @@
-#include "yomitandicts/deconjugator.hpp"
+// Deconjugator ported from Jiten (https://github.com/Sirush/Jiten/blob/master/Jiten.Parser/Deconjugator.cs)
+#include "hoshidicts/deconjugator.hpp"
 
 #include <utf8.h>
 #include <xxh3.h>

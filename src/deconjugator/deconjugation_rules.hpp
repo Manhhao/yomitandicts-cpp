@@ -2,7 +2,7 @@
 
 #include <string_view>
 
-// Rules from https://github.com/Sirush/Jiten/blob/master/Shared/resources/deconjugator.json and
+// Rules from https://github.com/Sirush/Jiten/blob/master/Shared/resources/deconjugator.json
 static constexpr std::string_view deconjugation_rules = R"json(
 [
   {
