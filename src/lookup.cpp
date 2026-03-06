@@ -145,13 +145,9 @@ void Lookup::filter_by_pos(std::vector<TermResult>& terms, const DeconjugationFo
   }
 
   const auto& tag = form.tags.back();
-  // this should support dictionaries without deinflection support because:
-  // word needs conditions -> dict has an entry but doesn't have conditions
-  // => we give the dict the benefit of the doubt
-  // if a dict does define conditions, we execute the normal check
   std::erase_if(terms, [&](const TermResult& term) {
     if (term.rules.empty()) {
-      return false;
+      return true;
     }
     auto pos_tags = split_whitespace(term.rules);
     return std::ranges::none_of(pos_tags, [&](const std::string& p) { return p == tag || tag.starts_with(p); });
