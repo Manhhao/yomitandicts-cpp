@@ -1,4 +1,4 @@
-#include "yomitandicts/query.hpp"
+#include "hoshidicts/query.hpp"
 
 #include <sys/fcntl.h>
 #include <sys/mman.h>

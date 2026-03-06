@@ -4,9 +4,9 @@
 #include <print>
 #include <vector>
 
-#include "yomitandicts/deinflector.hpp"
-#include "yomitandicts/lookup.hpp"
-#include "yomitandicts/query.hpp"
+#include "hoshidicts/deinflector.hpp"
+#include "hoshidicts/lookup.hpp"
+#include "hoshidicts/query.hpp"
 
 int main(int argc, char** argv) {
   if (argc < 4) {

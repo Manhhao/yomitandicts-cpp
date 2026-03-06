@@ -1,4 +1,4 @@
-#include "yomitandicts/importer.hpp"
+#include "hoshidicts/importer.hpp"
 
 #include <zip.h>
 #include <zstd.h>

@@ -1,4 +1,4 @@
-#include "yomitandicts/deinflector.hpp"
+#include "hoshidicts/deinflector.hpp"
 
 #include <utf8.h>
 

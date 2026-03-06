@@ -2,10 +2,10 @@
 import PackageDescription
 
 let package = Package(
-    name: "yomitandicts-cpp",
+    name: "hoshidicts",
     platforms: [.iOS(.v18), .macOS(.v15)],
     products: [
-        .library(name: "CYomitanDicts", targets: ["CYomitanDicts"]),
+        .library(name: "CHoshiDicts", targets: ["CHoshiDicts"]),
     ],
     dependencies: [
         .package(path: "external/zstd"),
@@ -24,7 +24,7 @@ let package = Package(
             ]
         ),
         .target(
-            name: "CYomitanDicts",
+            name: "CHoshiDicts",
             dependencies: [
                 .product(name: "libzstd", package: "zstd"),
                 "Czip"

@@ -1,4 +1,4 @@
-#include "yomitandicts/lookup.hpp"
+#include "hoshidicts/lookup.hpp"
 
 #include <utf8.h>
 
