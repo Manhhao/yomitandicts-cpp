@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22.1)
 cmake_policy(SET CMP0077 NEW)
 
-project(yomitan-dict-import LANGUAGES CXX)
+project(hoshidicts LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -19,36 +19,36 @@ add_subdirectory(external/zstd)
 
 target_compile_definitions(zip PRIVATE MINIZ_DISABLE_ZIP_READER_CRC32_CHECKS)
 
-add_library(yomitandicts
+add_library(hoshidicts
     src/hash/hash.cpp
     src/importer.cpp
     src/json/yomitan_parser.cpp
     src/text_processor/text_processor.cpp
-    src/deinflector.cpp
+    src/deconjugator/deconjugator.cpp
     src/query.cpp
     src/lookup.cpp
 )
 
-target_include_directories(yomitandicts PUBLIC
+target_include_directories(hoshidicts PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/external/utfcpp/source
 )
 
-target_link_libraries(yomitandicts PRIVATE
+target_link_libraries(hoshidicts PRIVATE
     PTHASH
     zip
     glaze::glaze
     libzstd_static
 )
 
-add_executable(yomitandicts-cpp
+add_executable(hoshidicts-cli
     cli/main.cpp
 )
 
-target_link_libraries(yomitandicts-cpp PRIVATE
+target_link_libraries(hoshidicts-cli PRIVATE
     PTHASH
     glaze::glaze
-    yomitandicts
+    hoshidicts
 )
 
 add_executable(benchmark-import
@@ -56,7 +56,7 @@ add_executable(benchmark-import
 )
 
 target_link_libraries(benchmark-import PRIVATE
-    yomitandicts
+    hoshidicts
 )
 
 add_executable(benchmark-lookup
@@ -64,5 +64,5 @@ add_executable(benchmark-lookup
 )
 
 target_link_libraries(benchmark-lookup PRIVATE
-    yomitandicts
+    hoshidicts
 )

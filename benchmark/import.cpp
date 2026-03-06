@@ -5,7 +5,7 @@
 #include <print>
 #include <vector>
 
-#include "yomitandicts/importer.hpp"
+#include "hoshidicts/importer.hpp"
 
 int main(int argc, char** argv) {
   if (argc < 3) {

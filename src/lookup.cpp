@@ -1,4 +1,4 @@
-#include "yomitandicts/lookup.hpp"
+#include "hoshidicts/lookup.hpp"
 
 #include <utf8.h>
 
@@ -63,10 +63,20 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
     std::string search_str(lookup_string.begin(), search_str_it);
     auto processor_results = text_processor::process(search_str);
     for (auto& variant : processor_results) {
-      auto deinflection_results = deinflector_.deinflect(variant.text);
-      for (auto& deinflection : deinflection_results) {
-        auto terms = query_.query(deinflection.text);
-        filter_by_pos(terms, deinflection);
+      auto deconjugation_results = deconjugator_.deconjugate(variant.text);
+      std::map<std::pair<std::string, std::string>, const DeconjugationForm*> deduplicated;
+      for (const auto& form : deconjugation_results) {
+        auto [it, inserted] =
+            deduplicated.try_emplace(std::pair{form.text, form.tags.empty() ? std::string{} : form.tags.back()}, &form);
+        if (!inserted && form.process.size() < it->second->process.size()) {
+          it->second = &form;
+        }
+      }
+
+      for (const auto& [pair, form_ptr] : deduplicated) {
+        const auto& form = *form_ptr;
+        auto terms = query_.query(pair.first);
+        filter_by_pos(terms, form);
 
         for (const auto& term : terms) {
           // deduplicate glossaries
@@ -77,15 +87,15 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
             if (utf8::distance(search_str.begin(), search_str.end()) >
                 utf8::distance(it->second.matched.begin(), it->second.matched.end())) {
               it->second = LookupResult{.matched = search_str,
-                                        .deinflected = deinflection.text,
-                                        .trace = deinflection.trace,
+                                        .deinflected = form.text,
+                                        .process = form.process,
                                         .term = term,
                                         .preprocessor_steps = variant.steps};
             }
           } else {
             result_map.emplace(key, LookupResult{.matched = search_str,
-                                                 .deinflected = deinflection.text,
-                                                 .trace = deinflection.trace,
+                                                 .deinflected = form.text,
+                                                 .process = form.process,
                                                  .term = term,
                                                  .preprocessor_steps = variant.steps});
           }
@@ -113,10 +123,10 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
       return steps_a < steps_b;
     }
 
-    auto trace_len_a = a.trace.size();
-    auto trace_len_b = b.trace.size();
-    if (trace_len_a != trace_len_b) {
-      return trace_len_a < trace_len_b;
+    auto process_len_a = a.process.size();
+    auto process_len_b = b.process.size();
+    if (process_len_a != process_len_b) {
+      return process_len_a < process_len_b;
     }
 
     return freq_sort_order(a, b, freq_dict_order);
@@ -129,16 +139,17 @@ std::vector<LookupResult> Lookup::lookup(const std::string& lookup_string, int m
   return results;
 }
 
-void Lookup::filter_by_pos(std::vector<TermResult>& terms, const DeinflectionResult& d) {
-  if (d.conditions == 0) {
+void Lookup::filter_by_pos(std::vector<TermResult>& terms, const DeconjugationForm& form) {
+  if (form.tags.empty()) {
     return;
   }
-  // this should support dictionaries without deinflection support because:
-  // word needs conditions -> dict has an entry but doesn't have conditions
-  // => we give the dict the benefit of the doubt
-  // if a dict does define conditions, we execute the normal check
+
+  const auto& tag = form.tags.back();
   std::erase_if(terms, [&](const TermResult& term) {
-    auto dict_conditions = Deinflector::pos_to_conditions(split_whitespace(term.rules));
-    return dict_conditions != 0 && (dict_conditions & d.conditions) == 0;
+    if (term.rules.empty()) {
+      return true;
+    }
+    auto pos_tags = split_whitespace(term.rules);
+    return std::ranges::none_of(pos_tags, [&](const std::string& p) { return p == tag || tag.starts_with(p); });
   });
 }
