@@ -66,4 +66,4 @@ Results are filtered by part-of-speech tags defined in dictionaries, or added di
 - [utfcpp](https://github.com/nemtrif/utfcpp): BSL-1.0
 
 ## License
-hoshidicts is licensed under the MIT license. See [LICENSE](LICENSE) for details.
+hoshidicts (main-mit) is licensed under the MIT license. See [LICENSE](LICENSE) for details.
