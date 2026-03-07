@@ -1,3 +1,5 @@
+// rules and descriptions adopted from
+// https://github.com/yomidevs/yomitan/blob/master/ext/js/language/ja/japanese-transforms.js
 #include "hoshidicts/deinflector.hpp"
 
 #include <utf8.h>
@@ -6,18 +8,68 @@
 #include <cstddef>
 Deinflector::Deinflector() : max_length_(0) { init_transforms(); }
 
-static constexpr std::string_view shimau_english_description =
+namespace {
+constexpr std::string_view shimau_english_description =
     "1. Shows a sense of regret/surprise when you did have volition in doing something, but it turned out to be bad to "
     "do.\n"
     "2. Shows perfective/punctual achievement. This shows that an action has been completed.\n"
     "3. Shows unintentional action–“accidentally”.\n";
 
-static constexpr std::string_view passive_english_description =
+constexpr std::string_view passive_english_description =
     "1. Indicates an action received from an action performer.\n"
     "2. Expresses respect for the subject of action performer.\n";
 
-// rules and descriptions adopted from
-// https://github.com/yomidevs/yomitan/blob/master/ext/js/language/ja/japanese-transforms.js
+constexpr std::array<std::pair<std::string_view, std::string_view>, 4> iku_verbs = {{
+    {"いく", "いっ"},
+    {"行く", "行っ"},
+    {"逝く", "逝っ"},
+    {"往く", "往っ"},
+}};
+
+constexpr std::array<std::string_view, 12> godan_u_special_verbs = {
+    "こう", "とう", "請う", "乞う", "恋う", "問う", "訪う", "宣う", "曰う", "給う", "賜う", "揺蕩う",
+};
+
+constexpr std::array<std::pair<std::string_view, std::string_view>, 3> fu_verb_te_conjugations = {{
+    {"のたまう", "のたもう"},
+    {"たまう", "たもう"},
+    {"たゆたう", "たゆとう"},
+}};
+}
+
+void Deinflector::add_irregular(std::string_view suffix, uint32_t conditions_in, uint32_t conditions_out,
+                                int group_id) {
+  for (auto [verb, prefix] : iku_verbs) {
+    add_rule({
+        .from = std::string(prefix) + std::string(suffix),
+        .to = std::string(verb),
+        .conditions_in = conditions_in,
+        .conditions_out = conditions_out,
+        .group_id = group_id,
+    });
+  }
+
+  for (auto verb : godan_u_special_verbs) {
+    add_rule({
+        .from = std::string(verb) + std::string(suffix),
+        .to = std::string(verb),
+        .conditions_in = conditions_in,
+        .conditions_out = conditions_out,
+        .group_id = group_id,
+    });
+  }
+
+  for (auto [verb, te_root] : fu_verb_te_conjugations) {
+    add_rule({
+        .from = std::string(te_root) + std::string(suffix),
+        .to = std::string(verb),
+        .conditions_in = conditions_in,
+        .conditions_out = conditions_out,
+        .group_id = group_id,
+    });
+  }
+}
+
 void Deinflector::init_transforms() {
   int id =
       add_group({.name = "-ば",
@@ -257,8 +309,7 @@ void Deinflector::init_transforms() {
   add_rule({.from = "きたら", .to = "くる", .conditions_in = NONE, .conditions_out = VK, .group_id = id});
   add_rule({.from = "来たら", .to = "来る", .conditions_in = NONE, .conditions_out = VK, .group_id = id});
   add_rule({.from = "來たら", .to = "來る", .conditions_in = NONE, .conditions_out = VK, .group_id = id});
-  add_rule({.from = "いったら", .to = "いく", .conditions_in = NONE, .conditions_out = V5S, .group_id = id});
-  add_rule({.from = "行ったら", .to = "行く", .conditions_in = NONE, .conditions_out = V5S, .group_id = id});
+  add_irregular("たら", NONE, V5, id);
   add_rule({.from = "ましたら", .to = "ます", .conditions_in = NONE, .conditions_out = MASU, .group_id = id});
 
   id = add_group({.name = "-たり",
@@ -284,8 +335,7 @@ void Deinflector::init_transforms() {
   add_rule({.from = "きたり", .to = "くる", .conditions_in = NONE, .conditions_out = VK, .group_id = id});
   add_rule({.from = "来たり", .to = "来る", .conditions_in = NONE, .conditions_out = VK, .group_id = id});
   add_rule({.from = "來たり", .to = "來る", .conditions_in = NONE, .conditions_out = VK, .group_id = id});
-  add_rule({.from = "いったり", .to = "いく", .conditions_in = NONE, .conditions_out = V5S, .group_id = id});
-  add_rule({.from = "行ったり", .to = "行く", .conditions_in = NONE, .conditions_out = V5S, .group_id = id});
+  add_irregular("たり", NONE, V5, id);
 
   id = add_group(
       {.name = "-て",
@@ -311,8 +361,7 @@ void Deinflector::init_transforms() {
   add_rule({.from = "きて", .to = "くる", .conditions_in = TE, .conditions_out = VK, .group_id = id});
   add_rule({.from = "来て", .to = "来る", .conditions_in = TE, .conditions_out = VK, .group_id = id});
   add_rule({.from = "來て", .to = "來る", .conditions_in = TE, .conditions_out = VK, .group_id = id});
-  add_rule({.from = "いって", .to = "いく", .conditions_in = TE, .conditions_out = V5S, .group_id = id});
-  add_rule({.from = "行って", .to = "行く", .conditions_in = TE, .conditions_out = V5S, .group_id = id});
+  add_irregular("て", TE, V5, id);
   add_rule({.from = "まして", .to = "ます", .conditions_in = NONE, .conditions_out = MASU, .group_id = id});
 
   id = add_group({.name = "-ず",
@@ -683,8 +732,7 @@ void Deinflector::init_transforms() {
   add_rule({.from = "きた", .to = "くる", .conditions_in = TA, .conditions_out = VK, .group_id = id});
   add_rule({.from = "来た", .to = "来る", .conditions_in = TA, .conditions_out = VK, .group_id = id});
   add_rule({.from = "來た", .to = "來る", .conditions_in = TA, .conditions_out = VK, .group_id = id});
-  add_rule({.from = "いった", .to = "いく", .conditions_in = TA, .conditions_out = V5S, .group_id = id});
-  add_rule({.from = "行った", .to = "行く", .conditions_in = TA, .conditions_out = V5S, .group_id = id});
+  add_irregular("た", TA, V5, id);
   add_rule({.from = "ました", .to = "ます", .conditions_in = TA, .conditions_out = MASU, .group_id = id});
   add_rule({.from = "でした", .to = "", .conditions_in = TA, .conditions_out = MASEN, .group_id = id});
   add_rule({.from = "かった", .to = "", .conditions_in = TA, .conditions_out = MASEN | NN, .group_id = id});
@@ -863,7 +911,177 @@ void Deinflector::init_transforms() {
                       "Usage: Attach がる to the stem of i-adjectives. It itself conjugates as a godan verb."});
   add_rule({.from = "がる", .to = "い", .conditions_in = V5, .conditions_out = ADJ_I, .group_id = id});
 
-  // slang from line 1459 onwards missing
+  id = add_group({.name = "-え",
+                  .description = "Slang. A sound change of i-adjectives.\n"
+                                 "ai：やばい → やべぇ\n"
+                                 "ui：さむい → さみぃ/さめぇ\n"
+                                 "oi：すごい → すげぇ"});
+  add_rule({.from = "ねえ", .to = "ない", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "めえ", .to = "むい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "みい", .to = "むい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "ちぇえ", .to = "つい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "ちい", .to = "つい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "せえ", .to = "すい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "ええ", .to = "いい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "ええ", .to = "わい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "ええ", .to = "よい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "いぇえ", .to = "よい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "うぇえ", .to = "わい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "けえ", .to = "かい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "げえ", .to = "がい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "げえ", .to = "ごい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "せえ", .to = "さい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "めえ", .to = "まい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "ぜえ", .to = "ずい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "っぜえ", .to = "ずい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "れえ", .to = "らい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "ちぇえ", .to = "ちゃい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "でえ", .to = "どい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "れえ", .to = "れい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "べえ", .to = "ばい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "てえ", .to = "たい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "ねぇ", .to = "ない", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "めぇ", .to = "むい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "みぃ", .to = "むい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "ちぃ", .to = "つい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "せぇ", .to = "すい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "けぇ", .to = "かい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "げぇ", .to = "がい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "げぇ", .to = "ごい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "せぇ", .to = "さい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "めぇ", .to = "まい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "ぜぇ", .to = "ずい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "っぜぇ", .to = "ずい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "れぇ", .to = "らい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "でぇ", .to = "どい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "れぇ", .to = "れい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "べぇ", .to = "ばい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "てぇ", .to = "たい", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+
+  id = add_group({.name = "n-slang", .description = ""});
+  add_rule({.from = "んなさい", .to = "りなさい", .conditions_in = NONE, .conditions_out = NASAI, .group_id = id});
+  add_rule({.from = "らんない", .to = "られない", .conditions_in = ADJ_I, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "んない", .to = "らない", .conditions_in = ADJ_I, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "んなきゃ", .to = "らなきゃ", .conditions_in = NONE, .conditions_out = YA, .group_id = id});
+  add_rule({.from = "んなきゃ", .to = "れなきゃ", .conditions_in = NONE, .conditions_out = YA, .group_id = id});
+
+  id = add_group({.name = "imperative negative slang", .description = ""});
+  add_rule({.from = "んな", .to = "る", .conditions_in = NONE, .conditions_out = V, .group_id = id});
+
+  id = add_group({.name = "kansai-ben negative", .description = "Negative form of kansai-ben verbs"});
+  add_rule({.from = "へん", .to = "ない", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "ひん", .to = "ない", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "せえへん", .to = "しない", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "へんかった", .to = "なかった", .conditions_in = TA, .conditions_out = TA, .group_id = id});
+  add_rule({.from = "ひんかった", .to = "なかった", .conditions_in = TA, .conditions_out = TA, .group_id = id});
+  add_rule({.from = "うてへん", .to = "ってない", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+
+  id = add_group({.name = "kansai-ben -て", .description = "-て form of kansai-ben verbs"});
+  add_rule({.from = "うて", .to = "って", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "おうて", .to = "あって", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "こうて", .to = "かって", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "ごうて", .to = "がって", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "そうて", .to = "さって", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "ぞうて", .to = "ざって", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "とうて", .to = "たって", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "どうて", .to = "だって", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "のうて", .to = "なって", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "ほうて", .to = "はって", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "ぼうて", .to = "ばって", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "もうて", .to = "まって", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "ろうて", .to = "らって", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "ようて", .to = "やって", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "ゆうて", .to = "いって", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+
+  id = add_group({.name = "kansai-ben -た", .description = "-た form of kansai-ben terms"});
+  add_rule({.from = "うた", .to = "った", .conditions_in = TA, .conditions_out = TA, .group_id = id});
+  add_rule({.from = "おうた", .to = "あった", .conditions_in = TA, .conditions_out = TA, .group_id = id});
+  add_rule({.from = "こうた", .to = "かった", .conditions_in = TA, .conditions_out = TA, .group_id = id});
+  add_rule({.from = "ごうた", .to = "がった", .conditions_in = TA, .conditions_out = TA, .group_id = id});
+  add_rule({.from = "そうた", .to = "さった", .conditions_in = TA, .conditions_out = TA, .group_id = id});
+  add_rule({.from = "ぞうた", .to = "ざった", .conditions_in = TA, .conditions_out = TA, .group_id = id});
+  add_rule({.from = "とうた", .to = "たった", .conditions_in = TA, .conditions_out = TA, .group_id = id});
+  add_rule({.from = "どうた", .to = "だった", .conditions_in = TA, .conditions_out = TA, .group_id = id});
+  add_rule({.from = "のうた", .to = "なった", .conditions_in = TA, .conditions_out = TA, .group_id = id});
+  add_rule({.from = "ほうた", .to = "はった", .conditions_in = TA, .conditions_out = TA, .group_id = id});
+  add_rule({.from = "ぼうた", .to = "ばった", .conditions_in = TA, .conditions_out = TA, .group_id = id});
+  add_rule({.from = "もうた", .to = "まった", .conditions_in = TA, .conditions_out = TA, .group_id = id});
+  add_rule({.from = "ろうた", .to = "らった", .conditions_in = TA, .conditions_out = TA, .group_id = id});
+  add_rule({.from = "ようた", .to = "やった", .conditions_in = TA, .conditions_out = TA, .group_id = id});
+  add_rule({.from = "ゆうた", .to = "いった", .conditions_in = TA, .conditions_out = TA, .group_id = id});
+
+  id = add_group({.name = "kansai-ben -たら", .description = "-たら form of kansai-ben terms"});
+  add_rule({.from = "うたら", .to = "ったら", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "おうたら", .to = "あったら", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "こうたら", .to = "かったら", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "ごうたら", .to = "がったら", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "そうたら", .to = "さったら", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "ぞうたら", .to = "ざったら", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "とうたら", .to = "たったら", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "どうたら", .to = "だったら", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "のうたら", .to = "なったら", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "ほうたら", .to = "はったら", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "ぼうたら", .to = "ばったら", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "もうたら", .to = "まったら", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "ろうたら", .to = "らったら", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "ようたら", .to = "やったら", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "ゆうたら", .to = "いったら", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+
+  id = add_group({.name = "kansai-ben -たり", .description = "-たり form of kansai-ben terms"});
+  add_rule({.from = "うたり", .to = "ったり", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "おうたり", .to = "あったり", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "こうたり", .to = "かったり", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "ごうたり", .to = "がったり", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "そうたり", .to = "さったり", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "ぞうたり", .to = "ざったり", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "とうたり", .to = "たったり", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "どうたり", .to = "だったり", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "のうたり", .to = "なったり", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "ほうたり", .to = "はったり", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "ぼうたり", .to = "ばったり", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "もうたり", .to = "まったり", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "ろうたり", .to = "らったり", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "ようたり", .to = "やったり", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+  add_rule({.from = "ゆうたり", .to = "いったり", .conditions_in = NONE, .conditions_out = NONE, .group_id = id});
+
+  id = add_group({.name = "kansai-ben -く", .description = "-く stem of kansai-ben adjectives"});
+  add_rule({.from = "う", .to = "く", .conditions_in = NONE, .conditions_out = KU, .group_id = id});
+  add_rule({.from = "こう", .to = "かく", .conditions_in = NONE, .conditions_out = KU, .group_id = id});
+  add_rule({.from = "ごう", .to = "がく", .conditions_in = NONE, .conditions_out = KU, .group_id = id});
+  add_rule({.from = "そう", .to = "さく", .conditions_in = NONE, .conditions_out = KU, .group_id = id});
+  add_rule({.from = "とう", .to = "たく", .conditions_in = NONE, .conditions_out = KU, .group_id = id});
+  add_rule({.from = "のう", .to = "なく", .conditions_in = NONE, .conditions_out = KU, .group_id = id});
+  add_rule({.from = "ぼう", .to = "ばく", .conditions_in = NONE, .conditions_out = KU, .group_id = id});
+  add_rule({.from = "もう", .to = "まく", .conditions_in = NONE, .conditions_out = KU, .group_id = id});
+  add_rule({.from = "ろう", .to = "らく", .conditions_in = NONE, .conditions_out = KU, .group_id = id});
+  add_rule({.from = "よう", .to = "よく", .conditions_in = NONE, .conditions_out = KU, .group_id = id});
+  add_rule({.from = "しゅう", .to = "しく", .conditions_in = NONE, .conditions_out = KU, .group_id = id});
+
+  id = add_group({.name = "kansai-ben adjective -て", .description = "-て form of kansai-ben adjectives"});
+  add_rule({.from = "うて", .to = "くて", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "こうて", .to = "かくて", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "ごうて", .to = "がくて", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "そうて", .to = "さくて", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "とうて", .to = "たくて", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "のうて", .to = "なくて", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "ぼうて", .to = "ばくて", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "もうて", .to = "まくて", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "ろうて", .to = "らくて", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "ようて", .to = "よくて", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "しゅうて", .to = "しくて", .conditions_in = TE, .conditions_out = TE, .group_id = id});
+
+  id = add_group({.name = "kansai-ben adjective negative", .description = "Negative form of kansai-ben adjectives"});
+  add_rule({.from = "うない", .to = "くない", .conditions_in = ADJ_I, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "こうない", .to = "かくない", .conditions_in = ADJ_I, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "ごうない", .to = "がくない", .conditions_in = ADJ_I, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "そうない", .to = "さくない", .conditions_in = ADJ_I, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "とうない", .to = "たくない", .conditions_in = ADJ_I, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "のうない", .to = "なくない", .conditions_in = ADJ_I, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "ぼうない", .to = "ばくない", .conditions_in = ADJ_I, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "もうない", .to = "まくない", .conditions_in = ADJ_I, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "ろうない", .to = "らくない", .conditions_in = ADJ_I, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "ようない", .to = "よくない", .conditions_in = ADJ_I, .conditions_out = ADJ_I, .group_id = id});
+  add_rule({.from = "しゅうない", .to = "しくない", .conditions_in = ADJ_I, .conditions_out = ADJ_I, .group_id = id});
 }
 
 int Deinflector::add_group(const TransformGroup& group) {

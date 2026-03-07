@@ -63,6 +63,7 @@ class Deinflector {
 
   int add_group(const TransformGroup& group);
   void add_rule(const Rule& rule);
+  void add_irregular(std::string_view suffix, uint32_t conditions_in, uint32_t conditions_out, int group_id);
 
   std::unordered_map<std::string, std::vector<Rule>> transforms_;
   std::vector<TransformGroup> groups_;
