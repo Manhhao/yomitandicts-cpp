@@ -133,12 +133,8 @@ void Lookup::filter_by_pos(std::vector<TermResult>& terms, const DeinflectionRes
   if (d.conditions == 0) {
     return;
   }
-  // this should support dictionaries without deinflection support because:
-  // word needs conditions -> dict has an entry but doesn't have conditions
-  // => we give the dict the benefit of the doubt
-  // if a dict does define conditions, we execute the normal check
   std::erase_if(terms, [&](const TermResult& term) {
     auto dict_conditions = Deinflector::pos_to_conditions(split_whitespace(term.rules));
-    return dict_conditions != 0 && (dict_conditions & d.conditions) == 0;
+    return (dict_conditions & d.conditions) == 0;
   });
 }
