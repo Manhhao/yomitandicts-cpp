@@ -1082,6 +1082,102 @@ void Deinflector::init_transforms() {
   add_rule({.from = "ろうない", .to = "らくない", .conditions_in = ADJ_I, .conditions_out = ADJ_I, .group_id = id});
   add_rule({.from = "ようない", .to = "よくない", .conditions_in = ADJ_I, .conditions_out = ADJ_I, .group_id = id});
   add_rule({.from = "しゅうない", .to = "しくない", .conditions_in = ADJ_I, .conditions_out = ADJ_I, .group_id = id});
+
+  // additional rules
+  id = add_group({.name = "-ましゅ",
+                  .description = "Polite (childish).\n"
+                                 "Usage: Replace ます with ましゅ."});
+  add_rule({.from = "ましゅ", .to = "ます", .conditions_in = NONE, .conditions_out = MASU, .group_id = id});
+
+  id = add_group({.name = "-ください",
+                  .description = "Polite request.\n"
+                                 "Usage: Attach ください after the て-form of verbs."});
+  add_rule({.from = "てください", .to = "て", .conditions_in = NONE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "でください", .to = "で", .conditions_in = NONE, .conditions_out = TE, .group_id = id});
+
+  id = add_group({.name = "-あげる",
+                  .description = "Do for someone.\n"
+                                 "Usage: Attach あげる after the て-form of verbs."});
+  add_rule({.from = "てあげる", .to = "て", .conditions_in = V1, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "であげる", .to = "で", .conditions_in = V1, .conditions_out = TE, .group_id = id});
+
+  id = add_group({.name = "-くれる",
+                  .description = "Do for me/us.\n"
+                                 "Usage: Attach くれる after the て-form of verbs."});
+  add_rule({.from = "てくれる", .to = "て", .conditions_in = V1, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "でくれる", .to = "で", .conditions_in = V1, .conditions_out = TE, .group_id = id});
+
+  id = add_group({.name = "-もらう",
+                  .description = "Receive the favour of doing.\n"
+                                 "Usage: Attach もらう after the て-form of verbs."});
+  add_rule({.from = "てもらう", .to = "て", .conditions_in = V5, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "でもらう", .to = "で", .conditions_in = V5, .conditions_out = TE, .group_id = id});
+
+  id = add_group({.name = "-やる",
+                  .description = "Do for someone (casual).\n"
+                                 "Usage: Attach やる after the て-form of verbs."});
+  add_rule({.from = "てやる", .to = "て", .conditions_in = V5, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "でやる", .to = "で", .conditions_in = V5, .conditions_out = TE, .group_id = id});
+
+  id = add_group({.name = "-さしあげる",
+                  .description = "Do for someone (humble).\n"
+                                 "Usage: Attach さしあげる after the て-form of verbs."});
+  add_rule({.from = "てさしあげる", .to = "て", .conditions_in = V1, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "でさしあげる", .to = "で", .conditions_in = V1, .conditions_out = TE, .group_id = id});
+
+  id = add_group({.name = "-みる",
+                  .description = "Try to do something.\n"
+                                 "Usage: Attach みる after the て-form of verbs."});
+  add_rule({.from = "てみる", .to = "て", .conditions_in = V1, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "でみる", .to = "で", .conditions_in = V1, .conditions_out = TE, .group_id = id});
+
+  id = add_group({.name = "-ある",
+                  .description = "Resultant state (intentional).\n"
+                                 "Usage: Attach ある after the て-form of verbs."});
+  add_rule({.from = "てある", .to = "て", .conditions_in = V5, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "である", .to = "で", .conditions_in = V5, .conditions_out = TE, .group_id = id});
+
+  id = add_group({.name = "-いく",
+                  .description = "1. Action away from speaker.\n"
+                                 "2. Indicates change continuing into the future.\n"
+                                 "Usage: Attach いく / く after the て-form of verbs."});
+  add_rule({.from = "ていく", .to = "て", .conditions_in = V5, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "でいく", .to = "で", .conditions_in = V5, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "てく", .to = "て", .conditions_in = V5, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "でく", .to = "で", .conditions_in = V5, .conditions_out = TE, .group_id = id});
+
+  id = add_group({.name = "-くる",
+                  .description = "1. Action towards speaker.\n"
+                                 "2. Indicates ongoing change extending to present.\n"
+                                 "3. Inception of a process.\n"
+                                 "Usage: Attach くる after the て-form of verbs."});
+  add_rule({.from = "てくる", .to = "て", .conditions_in = VK, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "でくる", .to = "で", .conditions_in = VK, .conditions_out = TE, .group_id = id});
+
+  id = add_group({.name = "-なさそう",
+                  .description = "Appearing not to be; does not seem like.\n"
+                                 "Usage: Replace ない with なさそう."});
+  add_rule({.from = "なさそう", .to = "ない", .conditions_in = NONE, .conditions_out = ADJ_I, .group_id = id});
+
+  id = add_group({.name = "-ながら",
+                  .description = "While doing something.\n"
+                                 "Usage: Attach ながら after the continuative form (連用形) of verbs."});
+  add_rule({.from = "ながら", .to = "る", .conditions_in = NONE, .conditions_out = V1, .group_id = id});
+  add_rule({.from = "いながら", .to = "う", .conditions_in = NONE, .conditions_out = V5, .group_id = id});
+  add_rule({.from = "きながら", .to = "く", .conditions_in = NONE, .conditions_out = V5, .group_id = id});
+  add_rule({.from = "ぎながら", .to = "ぐ", .conditions_in = NONE, .conditions_out = V5, .group_id = id});
+  add_rule({.from = "しながら", .to = "す", .conditions_in = NONE, .conditions_out = V5, .group_id = id});
+  add_rule({.from = "ちながら", .to = "つ", .conditions_in = NONE, .conditions_out = V5, .group_id = id});
+  add_rule({.from = "にながら", .to = "ぬ", .conditions_in = NONE, .conditions_out = V5, .group_id = id});
+  add_rule({.from = "びながら", .to = "ぶ", .conditions_in = NONE, .conditions_out = V5, .group_id = id});
+  add_rule({.from = "みながら", .to = "む", .conditions_in = NONE, .conditions_out = V5, .group_id = id});
+  add_rule({.from = "りながら", .to = "る", .conditions_in = NONE, .conditions_out = V5, .group_id = id});
+  add_rule({.from = "じながら", .to = "ずる", .conditions_in = NONE, .conditions_out = VZ, .group_id = id});
+  add_rule({.from = "しながら", .to = "する", .conditions_in = NONE, .conditions_out = VS, .group_id = id});
+  add_rule({.from = "為ながら", .to = "為る", .conditions_in = NONE, .conditions_out = VS, .group_id = id});
+  add_rule({.from = "きながら", .to = "くる", .conditions_in = NONE, .conditions_out = VK, .group_id = id});
+  add_rule({.from = "来ながら", .to = "来る", .conditions_in = NONE, .conditions_out = VK, .group_id = id});
+  add_rule({.from = "來ながら", .to = "來る", .conditions_in = NONE, .conditions_out = VK, .group_id = id});
 }
 
 int Deinflector::add_group(const TransformGroup& group) {
@@ -1152,7 +1248,7 @@ void Deinflector::deinflect_recursive(const std::string& text, uint32_t conditio
 
         std::string transformed = prefix + rule.to;
 
-        trace.emplace_back(groups_[rule.group_id]);
+        trace.push_back(groups_[rule.group_id]);
         deinflect_recursive(transformed, rule.conditions_out, trace, results);
         trace.pop_back();
       }
