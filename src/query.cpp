@@ -174,8 +174,9 @@ std::vector<TermResult> DictionaryQuery::query(const std::string& expression) co
         continue;
       }
 
+      uint64_t glossary_offset = read_u64(blob_addr);
       uint32_t glossary_size = read_u32(blob_addr);
-      std::string glossary = decompress_glossary(read_str(blob_addr, glossary_size).data(), glossary_size);
+      std::string glossary = decompress_glossary(data->blobs + glossary_offset, glossary_size);
 
       uint8_t def_tags_size = read_u8(blob_addr);
       std::string_view definition_tags = read_str(blob_addr, def_tags_size);

@@ -1,5 +1,6 @@
 #include "hoshidicts/importer.hpp"
 
+#include <xxh3.h>
 #include <zip.h>
 #include <zstd.h>
 
@@ -31,7 +32,9 @@ struct Files {
 
 struct ProcessedFile {
   std::vector<char> data;
-  std::unordered_map<std::string, std::vector<uint64_t>> offsets;
+  std::unordered_map<std::string, std::vector<uint64_t>> term_offsets;
+  std::unordered_map<uint64_t, std::vector<char>> glossaries;
+  std::vector<std::pair<size_t, uint64_t>> glossary_offsets;
   size_t count = 0;
 };
 
@@ -216,19 +219,25 @@ ProcessedFile process_term_bank(const std::string& content) {
 
   for (auto& term : out) {
     const std::string_view glossary = term.glossary.str;
-    const size_t bound = ZSTD_compressBound(glossary.size());
-    compressed.resize(bound);
-    const size_t compressed_size =
-        ZSTD_compressCCtx(cctx, compressed.data(), bound, glossary.data(), glossary.size(), 0);
-    if (ZSTD_isError(compressed_size)) {
-      ZSTD_freeCCtx(cctx);
-      throw std::runtime_error("failed to compress glossary");
+    uint64_t glossary_hash = XXH3_64bits(glossary.data(), glossary.size());
+    auto it = processed.glossaries.find(glossary_hash);
+    if (it == processed.glossaries.end()) {
+      const size_t bound = ZSTD_compressBound(glossary.size());
+      compressed.resize(bound);
+      const size_t compressed_size =
+          ZSTD_compressCCtx(cctx, compressed.data(), bound, glossary.data(), glossary.size(), 0);
+      if (ZSTD_isError(compressed_size)) {
+        ZSTD_freeCCtx(cctx);
+        throw std::runtime_error("failed to compress glossary");
+      }
+      compressed.resize(compressed_size);
+      processed.glossaries[glossary_hash] = compressed;
     }
 
     uint64_t offset = processed.data.size();
+    uint32_t blob_size = processed.glossaries[glossary_hash].size();
     std::string_view expr = term.expression;
     std::string_view reading = term.reading.empty() ? expr : term.reading;
-    std::string_view blob{compressed.data(), compressed_size};
     std::string_view definition_tags = term.definition_tags.value_or("");
 
     write_u8(processed.data, 0);
@@ -236,8 +245,12 @@ ProcessedFile process_term_bank(const std::string& content) {
     write_str(processed.data, expr);
     write_u16(processed.data, reading.size());
     write_str(processed.data, reading);
-    write_u32(processed.data, blob.size());
-    write_str(processed.data, blob);
+
+    uint64_t glossary_offset = processed.data.size();
+    write_u64(processed.data, 0);
+    write_u32(processed.data, blob_size);
+    processed.glossary_offsets.emplace_back(glossary_offset, glossary_hash);
+
     write_u8(processed.data, definition_tags.size());
     write_str(processed.data, definition_tags);
     write_u8(processed.data, term.rules.size());
@@ -245,9 +258,9 @@ ProcessedFile process_term_bank(const std::string& content) {
     write_u8(processed.data, term.term_tags.size());
     write_str(processed.data, term.term_tags);
 
-    processed.offsets[std::string(expr)].push_back(offset);
+    processed.term_offsets[std::string(expr)].push_back(offset);
     if (reading != expr) {
-      processed.offsets[std::string(reading)].push_back(offset);
+      processed.term_offsets[std::string(reading)].push_back(offset);
     }
     processed.count++;
   }
@@ -281,7 +294,7 @@ ProcessedFile process_meta_bank(const std::string& content) {
     write_u32(processed.data, data.size());
     write_str(processed.data, data);
 
-    processed.offsets[std::string(expr)].push_back(offset);
+    processed.term_offsets[std::string(expr)].push_back(offset);
     processed.count++;
   }
 
@@ -294,14 +307,35 @@ void write_terms(std::ofstream& file, std::unordered_map<std::string, std::vecto
     return;
   }
 
-  size_t max_threads = low_ram ? 3 : std::max<size_t>(2, static_cast<const unsigned long>(std::thread::hardware_concurrency() * 2));
+  size_t max_threads =
+      low_ram ? 3 : std::max<size_t>(2, static_cast<const unsigned long>(std::thread::hardware_concurrency() * 2));
   std::deque<std::future<ProcessedFile>> threads;
+
+  std::unordered_map<uint64_t, uint64_t> glossaries;
   auto write_processed = [&](ProcessedFile&& processed) {
     if (processed.data.empty()) {
       return;
     }
+
+    std::vector<char> glossary_buf;
+    for (auto& [hash, compressed] : processed.glossaries) {
+      if (glossaries.find(hash) == glossaries.end()) {
+        glossaries[hash] = write_offset;
+        write_bytes(glossary_buf, compressed.data(), compressed.size());
+        write_offset += compressed.size();
+      }
+    }
+    if (!glossary_buf.empty()) {
+      file.write(glossary_buf.data(), static_cast<std::streamsize>(glossary_buf.size()));
+    }
+
+    for (auto& [pos, hash] : processed.glossary_offsets) {
+      uint64_t glossary_offset = glossaries[hash];
+      std::memcpy(processed.data.data() + pos, &glossary_offset, sizeof(uint64_t));
+    }
+
     file.write(processed.data.data(), static_cast<std::streamsize>(processed.data.size()));
-    merge_offsets(offsets, processed.offsets, write_offset);
+    merge_offsets(offsets, processed.term_offsets, write_offset);
     write_offset += processed.data.size();
     result.term_count += processed.count;
   };
@@ -329,14 +363,15 @@ void write_meta(std::ofstream& file, std::unordered_map<std::string, std::vector
     return;
   }
 
-  size_t max_threads = low_ram ? 3 : std::max<size_t>(2, static_cast<const unsigned long>(std::thread::hardware_concurrency() * 2));
+  size_t max_threads =
+      low_ram ? 3 : std::max<size_t>(2, static_cast<const unsigned long>(std::thread::hardware_concurrency() * 2));
   std::deque<std::future<ProcessedFile>> threads;
   auto write_processed = [&](ProcessedFile&& processed) {
     if (processed.data.empty()) {
       return;
     }
     file.write(processed.data.data(), static_cast<std::streamsize>(processed.data.size()));
-    merge_offsets(offsets, processed.offsets, write_offset);
+    merge_offsets(offsets, processed.term_offsets, write_offset);
     write_offset += processed.data.size();
     result.meta_count += processed.count;
   };
