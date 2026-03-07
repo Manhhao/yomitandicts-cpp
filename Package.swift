@@ -8,7 +8,7 @@ let package = Package(
         .library(name: "CHoshiDicts", targets: ["CHoshiDicts"]),
     ],
     dependencies: [
-        .package(path: "external/zstd"),
+        .package(url: "https://github.com/facebook/zstd.git", from: "1.5.7"),
     ],
     targets: [
         .target(
