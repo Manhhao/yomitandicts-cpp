@@ -461,8 +461,8 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
     std::string path = dict_path.string();
     std::filesystem::create_directories(dict_path);
 
-    if (glz::write_file_json(index, path + "/info.json", std::string{})) {
-      throw std::runtime_error("failed to write info.json");
+    if (glz::write_file_json(index, path + "/index.json", std::string{})) {
+      throw std::runtime_error("failed to write index.json");
     }
 
     std::string styles = read_file_by_name(archive, "styles.css");

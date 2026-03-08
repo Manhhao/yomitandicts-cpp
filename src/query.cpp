@@ -79,13 +79,13 @@ DictionaryQuery& DictionaryQuery::operator=(DictionaryQuery&&) noexcept = defaul
 
 void DictionaryQuery::add_dict(const std::string& path, DictionaryType type) {
   Dictionary dict;
-  Index info;
+  Index index;
   std::string buf{};
-  if (glz::read_file_json(info, path + "/info.json", buf)) {
+  if (glz::read_file_json(index, path + "/index.json", buf)) {
     return;
   }
 
-  dict.name = info.title.empty() ? std::filesystem::path(path).stem().string() : info.title;
+  dict.name = index.title.empty() ? std::filesystem::path(path).stem().string() : index.title;
   if (std::filesystem::exists(path + "/styles.css")) {
     std::ifstream f(path + "/styles.css");
     dict.styles = std::string(std::istreambuf_iterator<char>(f), {});
