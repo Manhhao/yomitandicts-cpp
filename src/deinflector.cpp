@@ -760,9 +760,14 @@ void Deinflector::init_transforms() {
   add_rule({.from = "來ます", .to = "來る", .conditions_in = MASU, .conditions_out = VK, .group_id = id});
   add_rule({.from = "くあります", .to = "い", .conditions_in = MASU, .conditions_out = ADJ_I, .group_id = id});
   add_rule({.from = "くださいます", .to = "くださる", .conditions_in = MASU, .conditions_out = V5, .group_id = id});
+  add_rule({.from = "下さいます", .to = "下さる", .conditions_in = MASU, .conditions_out = V5, .group_id = id});
   add_rule(
       {.from = "いらっしゃいます", .to = "いらっしゃる", .conditions_in = MASU, .conditions_out = V5, .group_id = id});
   add_rule({.from = "ございます", .to = "ござる", .conditions_in = MASU, .conditions_out = V5, .group_id = id});
+  add_rule({.from = "なさいます", .to = "なさる", .conditions_in = MASU, .conditions_out = V5, .group_id = id});
+  add_rule({.from = "おっしゃいます", .to = "おっしゃる", .conditions_in = MASU, .conditions_out = V5, .group_id = id});
+  add_rule({.from = "仰います", .to = "仰る", .conditions_in = MASU, .conditions_out = V5, .group_id = id});
+  add_rule({.from = "仰有います", .to = "仰有る", .conditions_in = MASU, .conditions_out = V5, .group_id = id});
 
   id = add_group({.name = "potential",
                   .description = "Indicates a state of being (naturally) capable of doing an action.\n"
