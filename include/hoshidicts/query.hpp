@@ -54,12 +54,13 @@ class DictionaryQuery {
   void add_term_dict(const std::string& path);
   void add_freq_dict(const std::string& path);
   void add_pitch_dict(const std::string& path);
-  
+
   void query_freq(std::vector<TermResult>& terms) const;
   void query_pitch(std::vector<TermResult>& terms) const;
 
   std::vector<TermResult> query(const std::string& expression) const;
 
+  std::vector<char> get_media_file(const std::string& dict_name, const std::string& media_path) const;
   std::vector<DictionaryStyle> get_styles() const;
   std::vector<std::string> get_freq_dict_order() const;
 
@@ -70,16 +71,12 @@ class DictionaryQuery {
     std::string styles;
     std::unique_ptr<DictionaryData> data;
   };
-  enum DictionaryType : uint8_t {
-    TERM,
-    FREQ,
-    PITCH
-  };
+  enum DictionaryType : uint8_t { TERM, FREQ, PITCH };
 
   void add_dict(const std::string& path, DictionaryType);
 
   static std::string decompress_glossary(const void* data, size_t size);
-  std::vector<Dictionary> dicts_;
+  std::vector<Dictionary> term_dicts_;
   std::vector<Dictionary> freq_dicts_;
   std::vector<Dictionary> pitch_dicts_;
 };

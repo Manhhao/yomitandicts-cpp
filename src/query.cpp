@@ -54,6 +54,8 @@ struct DictionaryQuery::DictionaryData {
   size_t blobs_size = 0;
   uint64_t* offsets = nullptr;
   size_t offsets_size = 0;
+  uint8_t* media = nullptr;
+  size_t media_size = 0;
 
   ~DictionaryData() {
     if (blobs) {
@@ -61,6 +63,9 @@ struct DictionaryQuery::DictionaryData {
     }
     if (offsets) {
       munmap(offsets, offsets_size);
+    }
+    if (media) {
+      munmap(media, media_size);
     }
   }
 };
@@ -108,7 +113,7 @@ void DictionaryQuery::add_dict(const std::string& path, DictionaryType type) {
   close(fd);
 
   fd = open((path + "/blobs.bin").c_str(), O_RDONLY);
-  if (fd < 0) {
+  if (fd == -1) {
     return;
   }
 
@@ -125,9 +130,24 @@ void DictionaryQuery::add_dict(const std::string& path, DictionaryType type) {
   }
   close(fd);
 
+  fd = open((path + "/media.bin").c_str(), O_RDONLY);
+  if (fd != -1) {
+    if (fstat(fd, &st) != 0) {
+      close(fd);
+      return;
+    }
+    dict.data->media_size = st.st_size;
+    dict.data->media = reinterpret_cast<uint8_t*>(mmap(nullptr, st.st_size, PROT_READ, MAP_SHARED, fd, 0));
+    if (dict.data->media == MAP_FAILED) {
+      close(fd);
+      return;
+    }
+    close(fd);
+  }
+
   switch (type) {
     case TERM:
-      dicts_.push_back(std::move(dict));
+      term_dicts_.push_back(std::move(dict));
       break;
     case FREQ:
       freq_dicts_.push_back(std::move(dict));
@@ -148,7 +168,7 @@ void DictionaryQuery::add_pitch_dict(const std::string& path) {
 
 std::vector<TermResult> DictionaryQuery::query(const std::string& expression) const {
   std::map<std::pair<std::string_view, std::string_view>, TermResult> term_map;
-  for (const auto& [name, styles, data] : dicts_) {
+  for (const auto& [name, styles, data] : term_dicts_) {
     uint64_t hash = data->phf(expression);
     uint64_t offset_addr = data->offsets[hash];
     const uint8_t* index_addr = data->blobs + offset_addr;
@@ -340,8 +360,35 @@ std::string DictionaryQuery::decompress_glossary(const void* data, size_t size) 
   return result;
 }
 
+std::vector<char> DictionaryQuery::get_media_file(const std::string& dict_name, const std::string& media_path) const {
+  for (const auto& [name, styles, data] : term_dicts_) {
+    if (name != dict_name) {
+      continue;
+    }
+
+    if (data->media_size == 0) {
+      return {};
+    }
+
+    const uint8_t* addr = data->media;
+    const uint8_t* eof = addr + data->media_size;
+    while (addr < eof) {
+      uint16_t path_size = read_u16(addr);
+      std::string_view path = read_str(addr, path_size);
+      uint32_t media_size = read_u32(addr);
+      if (path != media_path) {
+        addr += media_size;
+      } else {
+        const char* media_data = reinterpret_cast<const char*>(addr);
+        return {media_data, media_data + media_size};
+      }
+    }
+  }
+  return {};
+}
+
 std::vector<DictionaryStyle> DictionaryQuery::get_styles() const {
-  return dicts_ | std::views::filter([](const auto& d) { return !d.styles.empty(); }) |
+  return term_dicts_ | std::views::filter([](const auto& d) { return !d.styles.empty(); }) |
          std::views::transform([](const auto& d) { return DictionaryStyle{d.name, d.styles}; }) |
          std::ranges::to<std::vector>();
 }
