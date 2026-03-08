@@ -56,6 +56,7 @@ struct DictionaryQuery::DictionaryData {
   size_t offsets_size = 0;
   uint8_t* media = nullptr;
   size_t media_size = 0;
+  std::unordered_map<std::string_view, std::pair<uint32_t, uint32_t>> media_index;
 
   ~DictionaryData() {
     if (blobs) {
@@ -143,6 +144,21 @@ void DictionaryQuery::add_dict(const std::string& path, DictionaryType type) {
       return;
     }
     close(fd);
+  }
+
+  if (dict.data->media_size > 0) {
+    const uint8_t* addr = dict.data->media;
+    const uint8_t* eof = addr + dict.data->media_size;
+    while (addr < eof) {
+      uint16_t path_size = read_u16(addr);
+      std::string_view media_path = read_str(addr, path_size);
+      uint32_t media_size = read_u32(addr);
+
+      dict.data->media_index.emplace(
+          media_path, std::pair<uint32_t, uint32_t>{media_size, static_cast<uint32_t>(addr - dict.data->media)});
+
+      addr += media_size;
+    }
   }
 
   switch (type) {
@@ -366,23 +382,14 @@ std::vector<char> DictionaryQuery::get_media_file(const std::string& dict_name, 
       continue;
     }
 
-    if (data->media_size == 0) {
+    auto it = data->media_index.find(media_path);
+    if (it == data->media_index.end()) {
       return {};
     }
 
-    const uint8_t* addr = data->media;
-    const uint8_t* eof = addr + data->media_size;
-    while (addr < eof) {
-      uint16_t path_size = read_u16(addr);
-      std::string_view path = read_str(addr, path_size);
-      uint32_t media_size = read_u32(addr);
-      if (path != media_path) {
-        addr += media_size;
-      } else {
-        const char* media_data = reinterpret_cast<const char*>(addr);
-        return {media_data, media_data + media_size};
-      }
-    }
+    const auto [size, offset] = it->second;
+    const char* media_data = reinterpret_cast<const char*>(data->media + offset);
+    return {media_data, media_data + size};
   }
   return {};
 }
