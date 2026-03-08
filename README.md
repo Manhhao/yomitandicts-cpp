@@ -36,6 +36,11 @@ std::vector<DictionaryStyle> DictionaryQuery::get_styles() const
 ```
 Returns CSS styles for all dictionaries, if present.
 
+```cpp
+std::vector<char> DictionaryQuery::get_media_file(const std::string& dict_name, const std::string& media_path) const
+```
+Returns raw bytes for file originally stored at `media_path` in term dictionary `dict_name` or an empty vector if the file does not exist.
+
 ### deconjugator
 ```cpp
 std::vector<DeconjugationForm> Deconjugator::deconjugate(const std::string& text) const
