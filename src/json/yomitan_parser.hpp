@@ -9,9 +9,9 @@ struct Index {
   std::string_view title;
   int format = 3;
   std::string_view revision;
-  bool updatable;
-  std::string_view index_url;
-  std::string_view download_url;
+  bool isUpdatable;
+  std::string_view indexUrl;
+  std::string_view downloadUrl;
 };
 
 struct Term {
