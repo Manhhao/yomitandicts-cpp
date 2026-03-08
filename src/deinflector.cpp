@@ -1185,11 +1185,11 @@ void Deinflector::init_transforms() {
   id = add_group({.name = "-いく",
                   .description = "1. Action away from speaker.\n"
                                  "2. Indicates change continuing into the future.\n"
-                                 "Usage: Attach いく / く after the て-form of verbs."});
+                                 "Usage: Attach いく after the て-form of verbs."});
   add_rule({.from = "ていく", .to = "て", .conditions_in = V5, .conditions_out = TE, .group_id = id});
   add_rule({.from = "でいく", .to = "で", .conditions_in = V5, .conditions_out = TE, .group_id = id});
-  add_rule({.from = "てく", .to = "て", .conditions_in = V5, .conditions_out = TE, .group_id = id});
-  add_rule({.from = "でく", .to = "で", .conditions_in = V5, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "てく", .to = "て", .conditions_in = NONE, .conditions_out = TE, .group_id = id});
+  add_rule({.from = "でく", .to = "で", .conditions_in = NONE, .conditions_out = TE, .group_id = id});
 
   id = add_group({.name = "-くる",
                   .description = "1. Action towards speaker.\n"
