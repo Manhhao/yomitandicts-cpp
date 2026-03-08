@@ -231,7 +231,7 @@ ProcessedFile process_term_bank(const std::string& content) {
         throw std::runtime_error("failed to compress glossary");
       }
       compressed.resize(compressed_size);
-      processed.glossaries[glossary_hash] = compressed;
+      processed.glossaries.emplace(glossary_hash, compressed);
     }
 
     uint64_t offset = processed.data.size();
@@ -415,13 +415,9 @@ void write_media(const std::string& path, zip_t* archive, const std::vector<int>
   }
 
   std::ofstream blobs(path + "/media.bin", std::ios::binary);
-  std::ofstream index(path + "/media_index.bin", std::ios::binary);
   setup_stream_exceptions(blobs);
-  setup_stream_exceptions(index);
 
-  uint64_t write_offset = 0;
   std::vector<char> blobs_buf;
-  std::vector<char> index_buf;
   for (int file_index : files) {
     auto media = read_media_by_index(archive, file_index);
     if (!media.has_value()) {
@@ -429,18 +425,14 @@ void write_media(const std::string& path, zip_t* archive, const std::vector<int>
     }
 
     const auto blob_size = media->blob.size();
+    write_u16(blobs_buf, media->path.size());
+    write_str(blobs_buf, media->path);
+    write_u32(blobs_buf, blob_size);
     write_bytes(blobs_buf, media->blob.data(), blob_size);
 
-    write_u16(index_buf, media->path.size());
-    write_str(index_buf, media->path);
-    write_u64(index_buf, write_offset);
-    write_u32(index_buf, blob_size);
-
-    write_offset += blob_size;
     result.media_count++;
   }
   blobs.write(blobs_buf.data(), static_cast<std::streamsize>(blobs_buf.size()));
-  index.write(index_buf.data(), static_cast<std::streamsize>(index_buf.size()));
 }
 }
 
@@ -508,6 +500,10 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
     setup_stream_exceptions(offs);
     offs.write(reinterpret_cast<const char*>(offset_hash_table.data()),
                static_cast<std::streamsize>(offset_hash_table.size() * sizeof(uint64_t)));
+
+    std::unordered_map<std::string, std::vector<uint64_t>>().swap(offsets);
+    std::vector<std::string_view>().swap(keys);
+    std::vector<uint64_t>().swap(key_offsets);
 
     write_media(path, archive, files.media_files, result);
 
