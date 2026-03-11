@@ -50,19 +50,19 @@ std::string read_file_by_index(zip_t* archive, int index) {
     return "";
   }
 
-  void* raw = nullptr;
-  size_t size = 0;
-  ssize_t bytes_read = zip_entry_read(archive, &raw, &size);
+  const size_t size = zip_entry_size(archive);
+  std::string buffer;
+  buffer.resize(size);
+  ssize_t bytes_read = 0;
+  if (size > 0) {
+    bytes_read = zip_entry_noallocread(archive, buffer.data(), size);
+  }
   zip_entry_close(archive);
-  if (bytes_read < 0 || !raw) {
-    if (raw) {
-      free(raw);
-    }
+
+  if (bytes_read < 0) {
     return "";
   }
 
-  std::unique_ptr<void, decltype(&std::free)> buf(raw, &std::free);
-  std::string buffer(static_cast<char*>(buf.get()), size);
   return buffer;
 }
 
@@ -71,20 +71,19 @@ std::string read_file_by_name(zip_t* archive, const char* name) {
     return "";
   }
 
-  void* raw = nullptr;
-  size_t size = 0;
-  ssize_t bytes_read = zip_entry_read(archive, &raw, &size);
+  const size_t size = zip_entry_size(archive);
+  std::string buffer;
+  buffer.resize(size);
+  ssize_t bytes_read = 0;
+  if (size > 0) {
+    bytes_read = zip_entry_noallocread(archive, buffer.data(), size);
+  }
   zip_entry_close(archive);
 
-  if (bytes_read < 0 || !raw) {
-    if (raw) {
-      free(raw);
-    }
+  if (bytes_read < 0) {
     return "";
   }
 
-  std::unique_ptr<void, decltype(&std::free)> buf(raw, &std::free);
-  std::string buffer(static_cast<char*>(buf.get()), size);
   return buffer;
 }
 
@@ -92,23 +91,21 @@ std::optional<MediaFile> read_media_by_index(zip_t* archive, int index) {
   if (zip_entry_openbyindex(archive, index) != 0) {
     return std::nullopt;
   }
-  MediaFile out;
 
-  void* raw = nullptr;
-  size_t size = 0;
-  ssize_t bytes_read = zip_entry_read(archive, &raw, &size);
+  MediaFile out;
+  const size_t size = zip_entry_size(archive);
   out.path = zip_entry_name(archive);
+  out.blob.resize(size);
+  ssize_t bytes_read = 0;
+  if (size > 0) {
+    bytes_read = zip_entry_noallocread(archive, out.blob.data(), size);
+  }
   zip_entry_close(archive);
-  if (bytes_read < 0 || !raw) {
-    if (raw) {
-      free(raw);
-    }
+
+  if (bytes_read < 0) {
     return std::nullopt;
   }
 
-  std::unique_ptr<void, decltype(&free)> buf(raw, free);
-  auto* p = static_cast<std::uint8_t*>(buf.get());
-  out.blob.assign(p, p + size);
   return out;
 }
 
@@ -414,8 +411,8 @@ void write_media(const std::string& path, zip_t* archive, const std::vector<int>
     return;
   }
 
-  std::ofstream blobs(path + "/media.bin", std::ios::binary);
-  setup_stream_exceptions(blobs);
+  std::ofstream media(path + "/media.bin", std::ios::binary);
+  setup_stream_exceptions(media);
 
   std::vector<char> blobs_buf;
   for (int file_index : files) {
@@ -432,7 +429,7 @@ void write_media(const std::string& path, zip_t* archive, const std::vector<int>
 
     result.media_count++;
   }
-  blobs.write(blobs_buf.data(), static_cast<std::streamsize>(blobs_buf.size()));
+  media.write(blobs_buf.data(), static_cast<std::streamsize>(blobs_buf.size()));
 }
 }
 
