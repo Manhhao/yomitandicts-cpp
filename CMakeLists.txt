@@ -17,7 +17,10 @@ add_subdirectory(external/glaze)
 add_subdirectory(external/pthash)
 add_subdirectory(external/zstd)
 
-target_compile_definitions(zip PRIVATE MINIZ_DISABLE_ZIP_READER_CRC32_CHECKS)
+target_compile_definitions(zip PRIVATE
+    MINIZ_DISABLE_ZIP_READER_CRC32_CHECKS
+    MINIZ_NO_TIME
+)
 
 add_library(hoshidicts
     src/hash/hash.cpp
