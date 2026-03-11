@@ -10,7 +10,7 @@ struct xxhash64_sv {
   }
 };
 struct mphf::phf {
-  pthash::single_phf<xxhash64_sv, pthash::skew_bucketer, pthash::compact, true> phf;
+  pthash::dense_partitioned_phf<xxhash64_sv, pthash::skew_bucketer, pthash::C_int, true> phf;
 };
 
 mphf::mphf() : ptr_(std::make_unique<phf>()) {};
@@ -20,6 +20,7 @@ uint64_t mphf::operator()(std::string_view key) const { return ptr_->phf(key); }
 void mphf::build(const std::vector<std::string_view>& keys) {
   pthash::build_configuration config;
   config.verbose = false;
+  config.dense_partitioning = true;
   config.num_threads = std::max<size_t>(1, std::thread::hardware_concurrency());
   ptr_->phf.build_in_internal_memory(keys.begin(), keys.size(), config);
 }
