@@ -504,6 +504,7 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
 
     write_media(path, archive, files.media_files, result);
 
+    std::ofstream sui(path + "/.hoshidicts_1");
     result.success = true;
   } catch (const std::exception& e) {
     result.success = false;
