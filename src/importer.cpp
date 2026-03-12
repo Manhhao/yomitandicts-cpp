@@ -303,7 +303,7 @@ void write_terms(std::ofstream& file, std::unordered_map<std::string, std::vecto
   }
 
   size_t max_threads =
-      low_ram ? 3 : std::max<size_t>(2, static_cast<const unsigned long>(std::thread::hardware_concurrency() * 2));
+      low_ram ? 3 : std::max<size_t>(4, static_cast<const unsigned long>(std::thread::hardware_concurrency() * 2));
   std::deque<std::future<ProcessedFile>> threads;
 
   std::unordered_map<uint64_t, uint64_t> glossaries;
@@ -359,7 +359,7 @@ void write_meta(std::ofstream& file, std::unordered_map<std::string, std::vector
   }
 
   size_t max_threads =
-      low_ram ? 3 : std::max<size_t>(2, static_cast<const unsigned long>(std::thread::hardware_concurrency() * 2));
+      low_ram ? 3 : std::max<size_t>(4, static_cast<const unsigned long>(std::thread::hardware_concurrency() * 2));
   std::deque<std::future<ProcessedFile>> threads;
   auto write_processed = [&](ProcessedFile&& processed) {
     if (processed.data.empty()) {
@@ -502,7 +502,9 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
 
     write_media(path, archive, files.media_files, result);
 
-    std::ofstream sui(path + "/.hoshidicts_1");
+    std::ofstream sui(path + "/.hoshidicts_1", std::ios::binary);
+    setup_stream_exceptions(sui);
+    sui.put(phf.type());
     result.success = true;
   } catch (const std::exception& e) {
     result.success = false;
