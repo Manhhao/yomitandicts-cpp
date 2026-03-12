@@ -16,6 +16,7 @@ add_subdirectory(external/zip)
 add_subdirectory(external/glaze)
 add_subdirectory(external/pthash)
 add_subdirectory(external/zstd)
+add_subdirectory(external/unordered_dense)
 
 target_compile_definitions(zip PRIVATE
     MINIZ_DISABLE_ZIP_READER_CRC32_CHECKS
@@ -42,6 +43,7 @@ target_link_libraries(hoshidicts PRIVATE
     zip
     glaze::glaze
     libzstd_static
+    unordered_dense
 )
 
 add_executable(hoshidicts-cli

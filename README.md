@@ -75,6 +75,7 @@ Results are filtered by part-of-speech tags defined in dictionaries, or added di
 - [pthash](https://github.com/jermp/pthash): MIT
 - [zstd](https://github.com/facebook/zstd): BSD
 - [utfcpp](https://github.com/nemtrif/utfcpp): BSL-1.0
+- [unordered_dense](https://github.com/martinus/unordered_dense.git): MIT
 
 ## License
 hoshidicts (main) is licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE) for details.
