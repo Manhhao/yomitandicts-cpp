@@ -1,5 +1,6 @@
 #include "hoshidicts/importer.hpp"
 
+#include <ankerl/unordered_dense.h>
 #include <xxh3.h>
 #include <zip.h>
 #include <zstd.h>
@@ -16,7 +17,6 @@
 #include <string>
 #include <string_view>
 #include <thread>
-#include <unordered_map>
 #include <vector>
 
 #include "hash/hash.hpp"
@@ -32,8 +32,8 @@ struct Files {
 
 struct ProcessedFile {
   std::vector<char> data;
-  std::unordered_map<std::string, std::vector<uint64_t>> term_offsets;
-  std::unordered_map<uint64_t, std::vector<char>> glossaries;
+  ankerl::unordered_dense::map<std::string, std::vector<uint64_t>> term_offsets;
+  ankerl::unordered_dense::map<uint64_t, std::vector<char>> glossaries;
   std::vector<std::pair<size_t, uint64_t>> glossary_offsets;
   size_t count = 0;
 };
@@ -180,18 +180,20 @@ void write_bytes(std::vector<char>& out, const void* data, size_t n) {
   std::memcpy(out.data() + old_size, data, n);
 }
 
-void merge_offsets(std::unordered_map<std::string, std::vector<uint64_t>>& a,
-                   std::unordered_map<std::string, std::vector<uint64_t>>& b, uint64_t write_offset) {
+void merge_offsets(ankerl::unordered_dense::map<std::string, std::vector<uint64_t>>& a,
+                   ankerl::unordered_dense::map<std::string, std::vector<uint64_t>>& b, uint64_t write_offset) {
   for (auto& [key, b_offsets] : b) {
     for (auto& offset : b_offsets) {
       offset += write_offset;
     }
-  }
 
-  a.merge(b);
-  for (auto& [key, b_offsets] : b) {
-    auto& values = a.find(key)->second;
-    values.insert(values.end(), b_offsets.begin(), b_offsets.end());
+    auto it = a.find(key);
+    if (it == a.end()) {
+      a.emplace(key, std::move(b_offsets));
+    } else {
+      auto& values = it->second;
+      values.insert(values.end(), b_offsets.begin(), b_offsets.end());
+    }
   }
 }
 
@@ -296,8 +298,9 @@ ProcessedFile process_meta_bank(const std::string& content) {
   return processed;
 }
 
-void write_terms(std::ofstream& file, std::unordered_map<std::string, std::vector<uint64_t>>& offsets, zip_t* archive,
-                 const std::vector<int>& files, uint64_t& write_offset, ImportResult& result, bool low_ram) {
+void write_terms(std::ofstream& file, ankerl::unordered_dense::map<std::string, std::vector<uint64_t>>& offsets,
+                 zip_t* archive, const std::vector<int>& files, uint64_t& write_offset, ImportResult& result,
+                 bool low_ram) {
   if (files.empty()) {
     return;
   }
@@ -306,7 +309,7 @@ void write_terms(std::ofstream& file, std::unordered_map<std::string, std::vecto
       low_ram ? 3 : std::max<size_t>(4, static_cast<const unsigned long>(std::thread::hardware_concurrency() * 2));
   std::deque<std::future<ProcessedFile>> threads;
 
-  std::unordered_map<uint64_t, uint64_t> glossaries;
+  ankerl::unordered_dense::map<uint64_t, uint64_t> glossaries;
   auto write_processed = [&](ProcessedFile&& processed) {
     if (processed.data.empty()) {
       return;
@@ -314,8 +317,8 @@ void write_terms(std::ofstream& file, std::unordered_map<std::string, std::vecto
 
     std::vector<char> glossary_buf;
     for (auto& [hash, compressed] : processed.glossaries) {
-      if (glossaries.find(hash) == glossaries.end()) {
-        glossaries[hash] = write_offset;
+      auto [it, inserted] = glossaries.try_emplace(hash, write_offset);
+      if (inserted) {
         write_bytes(glossary_buf, compressed.data(), compressed.size());
         write_offset += compressed.size();
       }
@@ -352,8 +355,9 @@ void write_terms(std::ofstream& file, std::unordered_map<std::string, std::vecto
   }
 }
 
-void write_meta(std::ofstream& file, std::unordered_map<std::string, std::vector<uint64_t>>& offsets, zip_t* archive,
-                const std::vector<int>& files, uint64_t& write_offset, ImportResult& result, bool low_ram) {
+void write_meta(std::ofstream& file, ankerl::unordered_dense::map<std::string, std::vector<uint64_t>>& offsets,
+                zip_t* archive, const std::vector<int>& files, uint64_t& write_offset, ImportResult& result,
+                bool low_ram) {
   if (files.empty()) {
     return;
   }
@@ -388,7 +392,7 @@ void write_meta(std::ofstream& file, std::unordered_map<std::string, std::vector
   }
 }
 
-void write_offset_index(std::ostream& file, std::unordered_map<std::string, std::vector<uint64_t>>& offsets,
+void write_offset_index(std::ostream& file, ankerl::unordered_dense::map<std::string, std::vector<uint64_t>>& offsets,
                         uint64_t& write_offset, std::vector<std::string_view>& keys,
                         std::vector<uint64_t>& key_offsets) {
   std::vector<char> offset_buf;
@@ -470,7 +474,7 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
     const Files files = get_files(archive);
     std::ofstream blobs(path + "/blobs.bin", std::ios::binary);
     setup_stream_exceptions(blobs);
-    std::unordered_map<std::string, std::vector<uint64_t>> offsets;
+    ankerl::unordered_dense::map<std::string, std::vector<uint64_t>> offsets;
     uint64_t write_offset = 0;
     write_terms(blobs, offsets, archive, files.term_banks, write_offset, result, low_ram);
     write_meta(blobs, offsets, archive, files.meta_banks, write_offset, result, low_ram);
@@ -496,7 +500,7 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
     offs.write(reinterpret_cast<const char*>(offset_hash_table.data()),
                static_cast<std::streamsize>(offset_hash_table.size() * sizeof(uint64_t)));
 
-    std::unordered_map<std::string, std::vector<uint64_t>>().swap(offsets);
+    ankerl::unordered_dense::map<std::string, std::vector<uint64_t>>().swap(offsets);
     std::vector<std::string_view>().swap(keys);
     std::vector<uint64_t>().swap(key_offsets);
 
