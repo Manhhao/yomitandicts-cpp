@@ -21,6 +21,7 @@ let package = Package(
                 .define("ZIP_BUILD_SHARED"),
                 .define("MINIZ_EXPORT", to: "__attribute__((visibility(\"hidden\")))"),
                 .define("MINIZ_DISABLE_ZIP_READER_CRC32_CHECKS"),
+                .define("MINIZ_NO_TIME")
             ]
         ),
         .target(
@@ -42,6 +43,7 @@ let package = Package(
                 .headerSearchPath("external/pthash/external/bits/external/essentials/include"),
                 .headerSearchPath("external/pthash/external/mm_file/include"),
                 .headerSearchPath("external/pthash/external/xxHash"),
+                .headerSearchPath("external/unordered_dense/include"),
                 .unsafeFlags(["-Wno-missing-braces"]),
             ],
             swiftSettings: [

@@ -1,5 +1,6 @@
 #include "hoshidicts/query.hpp"
 
+#include <ankerl/unordered_dense.h>
 #include <sys/fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -56,7 +57,7 @@ struct DictionaryQuery::DictionaryData {
   size_t offsets_size = 0;
   uint8_t* media = nullptr;
   size_t media_size = 0;
-  std::unordered_map<std::string_view, std::pair<uint32_t, uint32_t>> media_index;
+  ankerl::unordered_dense::map<std::string_view, std::pair<uint32_t, uint32_t>> media_index;
 
   ~DictionaryData() {
     if (blobs) {
