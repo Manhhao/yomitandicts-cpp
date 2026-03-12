@@ -82,6 +82,10 @@ void DictionaryQuery::add_dict(const std::string& path, DictionaryType type) {
     return;
   }
 
+  std::ifstream sui(path + "/.hoshidicts_1", std::ios::binary);
+  char hash_type;
+  sui.get(hash_type);
+
   Dictionary dict;
   Index index;
   std::string buf{};
@@ -96,7 +100,7 @@ void DictionaryQuery::add_dict(const std::string& path, DictionaryType type) {
   }
 
   dict.data = std::make_unique<DictionaryData>();
-  dict.data->phf.load(path + "/hash.mph");
+  dict.data->phf.load(path + "/hash.mph", static_cast<hash::phf_type>(hash_type));
 
   struct stat st{};
   int fd = open((path + "/offsets.bin").c_str(), O_RDONLY);
