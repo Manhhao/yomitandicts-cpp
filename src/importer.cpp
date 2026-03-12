@@ -186,14 +186,12 @@ void merge_offsets(std::unordered_map<std::string, std::vector<uint64_t>>& a,
     for (auto& offset : b_offsets) {
       offset += write_offset;
     }
+  }
 
-    auto it = a.find(key);
-    if (it == a.end()) {
-      a.emplace(key, std::move(b_offsets));
-    } else {
-      auto& values = it->second;
-      values.insert(values.end(), b_offsets.begin(), b_offsets.end());
-    }
+  a.merge(b);
+  for (auto& [key, b_offsets] : b) {
+    auto& values = a.find(key)->second;
+    values.insert(values.end(), b_offsets.begin(), b_offsets.end());
   }
 }
 
