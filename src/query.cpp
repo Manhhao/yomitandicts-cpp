@@ -1,10 +1,14 @@
 #include "hoshidicts/query.hpp"
 
 #include <ankerl/unordered_dense.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <sys/fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#endif
 #include <zstd.h>
 
 #include <cstddef>
@@ -19,6 +23,66 @@
 #include "json/yomitan_parser.hpp"
 
 namespace {
+std::pair<void*, size_t> map_file(const std::string& path) {
+#ifdef _WIN32
+  HANDLE file =
+      CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (file == INVALID_HANDLE_VALUE) {
+    return {};
+  }
+
+  LARGE_INTEGER file_size;
+  if (!GetFileSizeEx(file, &file_size)) {
+    CloseHandle(file);
+    return {};
+  }
+
+  HANDLE mapping = CreateFileMappingA(file, nullptr, PAGE_READONLY, 0, 0, nullptr);
+  CloseHandle(file);
+  if (!mapping) {
+    return {};
+  }
+
+  void* data = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, 0);
+  CloseHandle(mapping);
+  if (!data) {
+    return {};
+  }
+
+  return {data, static_cast<size_t>(file_size.QuadPart)};
+#else
+  int fd = open(path.c_str(), O_RDONLY);
+  if (fd == -1) {
+    return {};
+  }
+
+  struct stat st{};
+  if (fstat(fd, &st) != 0) {
+    close(fd);
+    return {};
+  }
+
+  void* data = mmap(nullptr, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
+  close(fd);
+  if (data == MAP_FAILED) {
+    return {};
+  }
+
+  return {data, static_cast<size_t>(st.st_size)};
+#endif
+}
+
+void unmap_file(void* data, size_t size) {
+  if (!data) {
+    return;
+  }
+#ifdef _WIN32
+  UnmapViewOfFile(data);
+#else
+  munmap(data, size);
+#endif
+}
+
 uint8_t read_u8(const uint8_t*& addr) { return *addr++; }
 
 uint16_t read_u16(const uint8_t*& addr) {
@@ -60,15 +124,9 @@ struct DictionaryQuery::DictionaryData {
   ankerl::unordered_dense::map<std::string_view, std::pair<uint32_t, uint32_t>> media_index;
 
   ~DictionaryData() {
-    if (blobs) {
-      munmap(blobs, blobs_size);
-    }
-    if (offsets) {
-      munmap(offsets, offsets_size);
-    }
-    if (media) {
-      munmap(media, media_size);
-    }
+    unmap_file(blobs, blobs_size);
+    unmap_file(offsets, offsets_size);
+    unmap_file(media, media_size);
   }
 };
 
@@ -103,56 +161,24 @@ void DictionaryQuery::add_dict(const std::string& path, DictionaryType type) {
   dict.data = std::make_unique<DictionaryData>();
   dict.data->phf.load(path + "/hash.mph", static_cast<hash::phf_type>(hash_type));
 
-  struct stat st{};
-  int fd = open((path + "/offsets.bin").c_str(), O_RDONLY);
-  if (fd == -1) {
+  auto [offsets, offsets_size] = map_file(path + "/offsets.bin");
+  if (!offsets) {
     return;
   }
+  dict.data->offsets_size = offsets_size;
+  dict.data->offsets = reinterpret_cast<uint64_t*>(offsets);
 
-  if (fstat(fd, &st) != 0) {
-    close(fd);
+  auto [blobs, blobs_size] = map_file(path + "/blobs.bin");
+  if (!blobs) {
     return;
   }
+  dict.data->blobs_size = blobs_size;
+  dict.data->blobs = reinterpret_cast<uint8_t*>(blobs);
 
-  dict.data->offsets_size = st.st_size;
-  dict.data->offsets = reinterpret_cast<uint64_t*>(mmap(nullptr, st.st_size, PROT_READ, MAP_SHARED, fd, 0));
-  if (dict.data->offsets == MAP_FAILED) {
-    close(fd);
-    return;
-  }
-  close(fd);
-
-  fd = open((path + "/blobs.bin").c_str(), O_RDONLY);
-  if (fd == -1) {
-    return;
-  }
-
-  if (fstat(fd, &st) != 0) {
-    close(fd);
-    return;
-  }
-
-  dict.data->blobs_size = st.st_size;
-  dict.data->blobs = reinterpret_cast<uint8_t*>(mmap(nullptr, st.st_size, PROT_READ, MAP_SHARED, fd, 0));
-  if (dict.data->blobs == MAP_FAILED) {
-    close(fd);
-    return;
-  }
-  close(fd);
-
-  fd = open((path + "/media.bin").c_str(), O_RDONLY);
-  if (fd != -1) {
-    if (fstat(fd, &st) != 0) {
-      close(fd);
-      return;
-    }
-    dict.data->media_size = st.st_size;
-    dict.data->media = reinterpret_cast<uint8_t*>(mmap(nullptr, st.st_size, PROT_READ, MAP_SHARED, fd, 0));
-    if (dict.data->media == MAP_FAILED) {
-      close(fd);
-      return;
-    }
-    close(fd);
+  auto [media, media_size] = map_file(path + "/media.bin");
+  if (media) {
+    dict.data->media_size = media_size;
+    dict.data->media = reinterpret_cast<uint8_t*>(media);
   }
 
   if (dict.data->media_size > 0) {
