@@ -299,8 +299,8 @@ ProcessedFile process_meta_bank(const std::string& content) {
 }
 
 void write_terms(std::ofstream& file, ankerl::unordered_dense::map<std::string, std::vector<uint64_t>>& offsets,
-                 zip_t* archive, const std::vector<int>& files, uint64_t& write_offset, ImportResult& result,
-                 bool low_ram) {
+                 const std::string& zip_path, const std::vector<int>& files, uint64_t& write_offset,
+                 ImportResult& result, bool low_ram) {
   if (files.empty()) {
     return;
   }
@@ -339,9 +339,15 @@ void write_terms(std::ofstream& file, ankerl::unordered_dense::map<std::string, 
   };
 
   for (int file_index : files) {
-    std::string content = read_file_by_index(archive, file_index);
-    threads.push_back(
-        std::async(std::launch::async, [content = std::move(content)]() { return process_term_bank(content); }));
+    threads.push_back(std::async(std::launch::async, [&zip_path, file_index]() {
+      zip_t* archive = zip_open(zip_path.c_str(), 0, 'r');
+      if (!archive) {
+        return ProcessedFile{};
+      }
+      std::string content = read_file_by_index(archive, file_index);
+      zip_close(archive);
+      return process_term_bank(content);
+    }));
 
     if (threads.size() == max_threads) {
       write_processed(threads.front().get());
@@ -356,8 +362,8 @@ void write_terms(std::ofstream& file, ankerl::unordered_dense::map<std::string, 
 }
 
 void write_meta(std::ofstream& file, ankerl::unordered_dense::map<std::string, std::vector<uint64_t>>& offsets,
-                zip_t* archive, const std::vector<int>& files, uint64_t& write_offset, ImportResult& result,
-                bool low_ram) {
+                const std::string& zip_path, const std::vector<int>& files, uint64_t& write_offset,
+                ImportResult& result, bool low_ram) {
   if (files.empty()) {
     return;
   }
@@ -376,9 +382,15 @@ void write_meta(std::ofstream& file, ankerl::unordered_dense::map<std::string, s
   };
 
   for (int file_index : files) {
-    std::string content = read_file_by_index(archive, file_index);
-    threads.push_back(
-        std::async(std::launch::async, [content = std::move(content)]() { return process_meta_bank(content); }));
+    threads.push_back(std::async(std::launch::async, [&zip_path, file_index]() {
+      zip_t* archive = zip_open(zip_path.c_str(), 0, 'r');
+      if (!archive) {
+        return ProcessedFile{};
+      }
+      std::string content = read_file_by_index(archive, file_index);
+      zip_close(archive);
+      return process_meta_bank(content);
+    }));
 
     if (threads.size() == max_threads) {
       write_processed(threads.front().get());
@@ -476,8 +488,8 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
     setup_stream_exceptions(blobs);
     ankerl::unordered_dense::map<std::string, std::vector<uint64_t>> offsets;
     uint64_t write_offset = 0;
-    write_terms(blobs, offsets, archive, files.term_banks, write_offset, result, low_ram);
-    write_meta(blobs, offsets, archive, files.meta_banks, write_offset, result, low_ram);
+    write_terms(blobs, offsets, zip_path, files.term_banks, write_offset, result, low_ram);
+    write_meta(blobs, offsets, zip_path, files.meta_banks, write_offset, result, low_ram);
     if (offsets.empty()) {
       throw std::runtime_error("empty dictionary");
     }
