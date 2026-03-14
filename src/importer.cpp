@@ -306,7 +306,7 @@ void write_terms(std::ofstream& file, ankerl::unordered_dense::map<std::string, 
   }
 
   size_t max_threads =
-      low_ram ? 3 : std::max<size_t>(4, static_cast<const unsigned long>(std::thread::hardware_concurrency() * 2));
+      low_ram ? 3 : std::max<size_t>(4, static_cast<const unsigned long>(std::thread::hardware_concurrency()));
   std::deque<std::future<ProcessedFile>> threads;
 
   ankerl::unordered_dense::map<uint64_t, uint64_t> glossaries;
@@ -369,7 +369,7 @@ void write_meta(std::ofstream& file, ankerl::unordered_dense::map<std::string, s
   }
 
   size_t max_threads =
-      low_ram ? 3 : std::max<size_t>(4, static_cast<const unsigned long>(std::thread::hardware_concurrency() * 2));
+      low_ram ? 3 : std::max<size_t>(4, static_cast<const unsigned long>(std::thread::hardware_concurrency()));
   std::deque<std::future<ProcessedFile>> threads;
   auto write_processed = [&](ProcessedFile&& processed) {
     if (processed.data.empty()) {
@@ -420,14 +420,15 @@ void write_offset_index(std::ostream& file, ankerl::unordered_dense::map<std::st
   file.write(offset_buf.data(), static_cast<std::streamsize>(offset_buf.size()));
 }
 
-void write_media(const std::string& path, zip_t* archive, const std::vector<int>& files, ImportResult& result) {
+size_t write_media(const std::string& path, zip_t* archive, const std::vector<int>& files) {
   if (files.empty()) {
-    return;
+    return 0;
   }
 
   std::ofstream media(path + "/media.bin", std::ios::binary);
   setup_stream_exceptions(media);
 
+  size_t media_count = 0;
   std::vector<char> blobs_buf;
   for (int file_index : files) {
     auto media = read_media_by_index(archive, file_index);
@@ -441,9 +442,10 @@ void write_media(const std::string& path, zip_t* archive, const std::vector<int>
     write_u32(blobs_buf, blob_size);
     write_bytes(blobs_buf, media->blob.data(), blob_size);
 
-    result.media_count++;
+    media_count++;
   }
   media.write(blobs_buf.data(), static_cast<std::streamsize>(blobs_buf.size()));
+  return media_count;
 }
 }
 
@@ -484,6 +486,10 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
     }
 
     const Files files = get_files(archive);
+    std::future<size_t> media_thread = std::async(std::launch::async, [&path, archive, &files = files.media_files]() {
+      return write_media(path, archive, files);
+    });
+
     std::ofstream blobs(path + "/blobs.bin", std::ios::binary);
     setup_stream_exceptions(blobs);
     ankerl::unordered_dense::map<std::string, std::vector<uint64_t>> offsets;
@@ -516,7 +522,7 @@ ImportResult dictionary_importer::import(const std::string& zip_path, const std:
     std::vector<std::string_view>().swap(keys);
     std::vector<uint64_t>().swap(key_offsets);
 
-    write_media(path, archive, files.media_files, result);
+    result.media_count = media_thread.get();
 
     std::ofstream sui(path + "/.hoshidicts_1", std::ios::binary);
     setup_stream_exceptions(sui);
