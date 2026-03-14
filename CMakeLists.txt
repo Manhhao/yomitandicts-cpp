@@ -24,6 +24,7 @@ target_compile_definitions(zip PRIVATE
 )
 
 target_compile_options(zip PRIVATE
+    -Wno-unknown-warning-option
     -Wno-error=stringop-truncation
 )
 
