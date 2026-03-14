@@ -23,6 +23,10 @@ target_compile_definitions(zip PRIVATE
     MINIZ_NO_TIME
 )
 
+target_compile_options(zip PRIVATE
+    -Wno-error=stringop-truncation
+)
+
 add_library(hoshidicts
     src/hash/hash.cpp
     src/importer.cpp

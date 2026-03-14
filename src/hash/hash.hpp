@@ -7,7 +7,8 @@
 namespace hash {
 enum phf_type : std::uint8_t {
   dense,
-  single
+  single,
+  xxh3_linear
 };
 class mphf {
  public:

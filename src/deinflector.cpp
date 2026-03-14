@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <array>
+
 Deinflector::Deinflector() : max_length_(0) { init_transforms(); }
 
 namespace {
